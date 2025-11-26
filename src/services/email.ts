@@ -29,7 +29,7 @@ export const emailService = {
   // Get email detail
   getEmailDetail: async (emailId: string): Promise<Email> => {
     if (USE_MOCK_API) {
-      return await mockEmailApi.getEmailById(emailId);
+      return await mockEmailApi.getEmailById(emailId) as unknown as Email;
     }
     
     const response = await apiClient.get<Email>(`/emails/${emailId}`);
