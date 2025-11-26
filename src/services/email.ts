@@ -17,7 +17,7 @@ export const emailService = {
   // Get emails for a specific mailbox
   getEmails: async (mailboxId: string, page: number = 1, perPage: number = 20): Promise<EmailListResponse> => {
     if (USE_MOCK_API) {
-      return await mockEmailApi.getEmails(mailboxId, page, perPage);
+      return await mockEmailApi.getEmails(mailboxId, page, perPage) as unknown as EmailListResponse;
     }
     
     const response = await apiClient.get<EmailListResponse>(`/mailboxes/${mailboxId}/emails`, {
