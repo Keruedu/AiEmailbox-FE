@@ -30,7 +30,7 @@ export default function LoginPage() {
         await signup({ 
           email: values.email, 
           password: values.password, 
-          name: values.name 
+          name: values.name || ""
         });
         message.success('Signup successful!');
       }
