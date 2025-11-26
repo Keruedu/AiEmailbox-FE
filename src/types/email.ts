@@ -1,0 +1,46 @@
+export interface Mailbox {
+  id: string;
+  name: string;
+  icon: string;
+  unreadCount: number;
+  type: 'system' | 'custom';
+}
+
+export interface EmailAddress {
+  name: string;
+  email: string;
+}
+
+export interface Attachment {
+  id: string;
+  filename: string;
+  size: number;
+  mimeType: string;
+  url: string;
+}
+
+export interface Email {
+  id: string;
+  mailboxId: string;
+  from: EmailAddress;
+  to: EmailAddress[];
+  cc?: EmailAddress[];
+  bcc?: EmailAddress[];
+  subject: string;
+  preview: string;
+  body: string;
+  isRead: boolean;
+  isStarred: boolean;
+  hasAttachments: boolean;
+  attachments?: Attachment[];
+  receivedAt: string;
+  createdAt: string;
+}
+
+export interface EmailListResponse {
+  emails: Email[];
+  total: number;
+  page: number;
+  perPage: number;
+  hasNextPage: boolean;
+}

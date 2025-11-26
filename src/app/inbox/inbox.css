@@ -1,0 +1,27 @@
+/* Responsive styles for inbox */
+@media (max-width: 992px) {
+  .email-list-layout {
+    max-width: 100% !important;
+  }
+
+  .mobile-back-button {
+    display: block !important;
+  }
+
+  /* Hide sidebar and email list when viewing email detail on mobile */
+  .mobile-hidden {
+    display: none !important;
+  }
+}
+
+@media (min-width: 993px) {
+  .mobile-back-button {
+    display: none !important;
+  }
+
+  /* Always show all columns on desktop, never hide them */
+  .mailbox-sider,
+  .email-list-layout {
+    display: flex !important;
+  }
+}
