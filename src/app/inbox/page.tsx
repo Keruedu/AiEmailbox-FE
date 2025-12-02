@@ -36,7 +36,7 @@ const iconMap: Record<string, React.ReactNode> = {
 export default function InboxPage() {
   const { user, logout } = useAuth();
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
-  const [selectedMailbox, setSelectedMailbox] = useState<string>('inbox');
+  const [selectedMailbox, setSelectedMailbox] = useState<string>('');
   const [emails, setEmails] = useState<Email[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [emailsLoading, setEmailsLoading] = useState(false);
@@ -55,7 +55,11 @@ export default function InboxPage() {
   const loadMailboxes = async () => {
     try {
       const data = await emailService.getMailboxes();
-      setMailboxes(data);
+      setMailboxes(data || []);
+      if (data && data.length > 0 && !selectedMailbox) {
+        const inbox = data.find(m => m.id === 'INBOX');
+        setSelectedMailbox(inbox ? 'INBOX' : data[0].id);
+      }
     } catch (error) {
       message.error('Failed to load mailboxes');
       console.error(error);
@@ -66,7 +70,7 @@ export default function InboxPage() {
     setEmailsLoading(true);
     try {
       const data = await emailService.getEmails(mailboxId);
-      setEmails(data.emails);
+      setEmails(data.emails || []);
       setSelectedEmail(null);
     } catch (error) {
       message.error('Failed to load emails');
@@ -160,22 +164,20 @@ export default function InboxPage() {
               mode="inline"
               selectedKeys={[selectedMailbox]}
               style={{ height: '100%', borderRight: 0 }}
-            >
-              {mailboxes.map((mailbox) => (
-                <Menu.Item
-                  key={mailbox.id}
-                  icon={iconMap[mailbox.icon] || <FolderOutlined />}
-                  onClick={() => handleMailboxSelect(mailbox.id)}
-                >
-                  <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              items={mailboxes.map((mailbox) => ({
+                key: mailbox.id,
+                icon: iconMap[mailbox.icon] || <FolderOutlined />,
+                onClick: () => handleMailboxSelect(mailbox.id),
+                label: (
+                  <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                     <span>{mailbox.name}</span>
                     {mailbox.unreadCount > 0 && (
                       <Badge count={mailbox.unreadCount} style={{ backgroundColor: '#667eea' }} />
                     )}
                   </span>
-                </Menu.Item>
-              ))}
-            </Menu>
+                ),
+              }))}
+            />
           </Sider>
 
           {/* Middle - Email List */}
