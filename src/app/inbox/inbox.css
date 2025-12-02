@@ -9,7 +9,12 @@
   }
 
   /* Hide sidebar and email list when viewing email detail on mobile */
-  .mobile-hidden {
+  .hidden-mobile {
+    display: none !important;
+  }
+
+  /* Hide user email on mobile to save space */
+  .header-user-email {
     display: none !important;
   }
 }

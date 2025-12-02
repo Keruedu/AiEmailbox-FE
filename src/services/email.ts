@@ -36,30 +36,73 @@ export const emailService = {
     return response.data;
   },
 
-  // Mark email as read
+  // Send email
+  sendEmail: async (to: string, subject: string, body: string): Promise<void> => {
+    if (USE_MOCK_API) {
+      // Mock implementation
+      return;
+    }
+    await apiClient.post('/emails/send', { to, subject, body });
+  },
+
+  // Reply to email
+  replyEmail: async (originalEmailId: string, to: string, subject: string, body: string): Promise<void> => {
+    if (USE_MOCK_API) {
+      // Mock implementation
+      return;
+    }
+    await apiClient.post(`/emails/${originalEmailId}/reply`, { to, subject, body });
+  },
+
+  // Modify email labels (mark read/unread, star, delete)
+  modifyEmail: async (emailId: string, addLabels: string[], removeLabels: string[]): Promise<void> => {
+    if (USE_MOCK_API) {
+      // Mock implementation
+      return;
+    }
+    await apiClient.post(`/emails/${emailId}/modify`, { addLabels, removeLabels });
+  },
+
+  // Get attachment URL
+  getAttachmentUrl: (messageId: string, attachmentId: string): string => {
+    if (USE_MOCK_API) {
+      return '#';
+    }
+    // Construct URL directly as it's a GET request with auth token handled by browser/interceptor?
+    // Actually for file download, we might need to handle auth token. 
+    // If using axios interceptor, we can't easily use a simple <a> tag href.
+    // But for simplicity, let's return the API URL and assume we might need a way to pass token if it was cookie based.
+    // Since we use Bearer token header, we might need to fetch blob via axios and create object URL.
+    return `${process.env.NEXT_PUBLIC_API_URL}/attachments/${attachmentId}?messageId=${messageId}`;
+  },
+
+  // Mark email as read (Updated to use modifyEmail)
   markAsRead: async (emailId: string): Promise<void> => {
     if (USE_MOCK_API) {
       return await mockEmailApi.markAsRead(emailId);
     }
-    
-    await apiClient.patch(`/emails/${emailId}/read`);
+    // Gmail API: Remove UNREAD label
+    await emailService.modifyEmail(emailId, [], ['UNREAD']);
   },
 
-  // Toggle star on email
-  toggleStar: async (emailId: string): Promise<void> => {
+  // Toggle star on email (Updated to use modifyEmail)
+  toggleStar: async (emailId: string, isStarred: boolean): Promise<void> => {
     if (USE_MOCK_API) {
       return await mockEmailApi.toggleStar(emailId);
     }
-    
-    await apiClient.patch(`/emails/${emailId}/star`);
+    if (isStarred) {
+      await emailService.modifyEmail(emailId, ['STARRED'], []);
+    } else {
+      await emailService.modifyEmail(emailId, [], ['STARRED']);
+    }
   },
 
-  // Delete email
+  // Delete email (Updated to use modifyEmail or delete endpoint)
   deleteEmail: async (emailId: string): Promise<void> => {
     if (USE_MOCK_API) {
       return await mockEmailApi.deleteEmail(emailId);
     }
-    
-    await apiClient.delete(`/emails/${emailId}`);
+    // Gmail API: Add TRASH label
+    await emailService.modifyEmail(emailId, ['TRASH'], []);
   },
 };

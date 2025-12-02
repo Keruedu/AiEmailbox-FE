@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Layout, Menu, List, Card, Button, Badge, Typography, Space, Avatar, Spin, message, Empty } from 'antd';
+import ComposeModal from '@/components/ComposeModal';
 import {
   InboxOutlined,
   StarOutlined,
@@ -14,6 +15,7 @@ import {
   LogoutOutlined,
   PaperClipOutlined,
   ArrowLeftOutlined,
+  EditOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { emailService } from '@/services/email';
@@ -41,6 +43,18 @@ export default function InboxPage() {
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [emailsLoading, setEmailsLoading] = useState(false);
   const [showMobileDetail, setShowMobileDetail] = useState(false);
+  const [isComposeVisible, setIsComposeVisible] = useState(false);
+
+  const handleComposeClose = () => {
+    setIsComposeVisible(false);
+  };
+
+  const handleComposeSend = () => {
+    setIsComposeVisible(false);
+    if (selectedMailbox === 'SENT') {
+      loadEmails('SENT');
+    }
+  };
 
   useEffect(() => {
     loadMailboxes();
@@ -123,43 +137,138 @@ export default function InboxPage() {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
+  const handleStar = async (e: React.MouseEvent, email: Email) => {
+    e.stopPropagation();
+    try {
+      // Toggle star: if currently starred, we want to unstar (isStarred=false), so we pass false.
+      // Wait, toggleStar implementation: if isStarred=true -> add STARRED label.
+      // So if email.isStarred is true, we want to remove it.
+      // My service implementation: toggleStar(id, isStarred) -> if isStarred, add label.
+      // So we should pass !email.isStarred to set the new state.
+      await emailService.toggleStar(email.id, !email.isStarred);
+      
+      // Optimistic update
+      const updateEmails = (list: Email[]) => list.map(e => 
+        e.id === email.id ? { ...e, isStarred: !e.isStarred } : e
+      );
+      setEmails(updateEmails(emails));
+      if (selectedEmail?.id === email.id) {
+        setSelectedEmail({ ...selectedEmail, isStarred: !selectedEmail.isStarred });
+      }
+      message.success(email.isStarred ? 'Unstarred' : 'Starred');
+    } catch (error) {
+      message.error('Failed to update star');
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, email: Email) => {
+    e.stopPropagation();
+    try {
+      await emailService.deleteEmail(email.id);
+      setEmails(emails.filter(e => e.id !== email.id));
+      if (selectedEmail?.id === email.id) {
+        setSelectedEmail(null);
+        setShowMobileDetail(false);
+      }
+      message.success('Email deleted');
+    } catch (error) {
+      message.error('Failed to delete email');
+    }
+  };
+
+  const handleDownloadAttachment = async (emailId: string, attachmentId: string, filename: string) => {
+    try {
+      const url = emailService.getAttachmentUrl(emailId, attachmentId);
+      // For authenticated download, we might need to fetch with axios and create blob
+      // But for now, let's try opening in new tab if it works with cookie/session
+      // Since we use Bearer token, we need to fetch it.
+      
+      // Simple fetch implementation
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}` // Assuming we can get token
+        }
+      });
+      
+      if (!response.ok) throw new Error('Download failed');
+      
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadUrl);
+      document.body.removeChild(a);
+    } catch (error) {
+      message.error('Failed to download attachment');
+    }
+  };
+
   return (
     <ProtectedRoute>
       <Layout style={{ minHeight: '100vh' }}>
-        <Header style={{ 
+        <Header className="inbox-header" style={{ 
           background: '#fff', 
-          padding: '0 24px', 
+          padding: '0 16px', 
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          zIndex: 1
+          zIndex: 1,
+          height: 'auto',
+          minHeight: '64px',
+          flexWrap: 'wrap'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <MailOutlined style={{ fontSize: '24px', color: '#667eea' }} />
-            <Title level={4} style={{ margin: 0 }}>AI Email Box</Title>
+            <Title level={4} style={{ margin: 0, whiteSpace: 'nowrap' }}>AI Email Box</Title>
           </div>
           <Space>
-            <Text>{user?.name || user?.email}</Text>
+            <Text className="header-user-email" style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user?.name || user?.email}
+            </Text>
             <Button icon={<LogoutOutlined />} onClick={handleLogout}>
               Logout
             </Button>
           </Space>
         </Header>
 
-        <Layout>
+        <Layout className="main-layout">
           {/* Left Sidebar - Mailboxes */}
           <Sider 
             width={250} 
             theme="light" 
             style={{ 
               borderRight: '1px solid #f0f0f0',
-              display: showMobileDetail ? 'none' : 'block'
+              // On mobile: hide if detail is shown OR if email list is shown (technically list is always shown on mobile unless detail is open)
+              // But we want Sider to be hidden on mobile generally unless toggled? 
+              // For simplicity: Mobile view = Stack. 
+              // If showMobileDetail is true, hide Sider.
+              // If showMobileDetail is false, show Sider? No, usually Sider is hidden behind a menu or takes full width.
+              // Let's make Sider hidden on small screens and use a Drawer or just stack it.
+              // For this assignment: 3-column on desktop, 1-column on mobile.
+              // Mobile: Mailbox List -> Email List -> Email Detail.
+              // So we need another state for "Show Mailbox List".
+              // Let's assume: Desktop = All 3 visible. Mobile = One active view.
             }}
             breakpoint="lg"
             collapsedWidth="0"
-            className="mailbox-sider"
+            className={`mailbox-sider ${showMobileDetail ? 'hidden-mobile' : ''}`}
           >
+            <div style={{ padding: '16px' }}>
+              <Button 
+                type="primary" 
+                icon={<EditOutlined />} 
+                block 
+                size="large"
+                onClick={() => setIsComposeVisible(true)}
+                style={{ marginBottom: '16px', borderRadius: '24px', height: '48px' }}
+              >
+                Compose
+              </Button>
+            </div>
             <Menu
               mode="inline"
               selectedKeys={[selectedMailbox]}
@@ -185,7 +294,7 @@ export default function InboxPage() {
             style={{ 
               display: showMobileDetail ? 'none' : 'flex',
               borderRight: '1px solid #f0f0f0',
-              maxWidth: '600px',
+              // On mobile, this should be visible if detail is NOT visible.
             }}
             className="email-list-layout"
           >
@@ -233,7 +342,9 @@ export default function InboxPage() {
                             <Text strong style={{ fontSize: '14px' }}>
                               {email.from.name || email.from.email}
                             </Text>
-                            {email.isStarred && <StarOutlined style={{ color: '#faad14' }} />}
+                            <div onClick={(e) => handleStar(e, email)}>
+                                {email.isStarred ? <StarOutlined style={{ color: '#faad14' }} /> : <StarOutlined style={{ color: '#d9d9d9' }} />}
+                            </div>
                             {email.hasAttachments && <PaperClipOutlined />}
                           </Space>
                           <Text type="secondary" style={{ fontSize: '12px' }}>
@@ -260,9 +371,10 @@ export default function InboxPage() {
               background: '#fff', 
               padding: showMobileDetail ? '0' : '24px',
               overflow: 'auto',
-              height: 'calc(100vh - 64px)'
+              height: 'calc(100vh - 64px)',
+              display: showMobileDetail ? 'block' : undefined // On desktop, it's flexed by Layout. On mobile, we toggle.
             }}
-            className="email-detail-content"
+            className={`email-detail-content ${!showMobileDetail ? 'hidden-mobile' : ''}`}
           >
             {showMobileDetail && (
               <Button 
@@ -313,10 +425,10 @@ export default function InboxPage() {
                     <Button type="primary">Reply</Button>
                     <Button>Reply All</Button>
                     <Button>Forward</Button>
-                    <Button icon={<StarOutlined />}>
+                    <Button icon={<StarOutlined />} onClick={(e) => handleStar(e, selectedEmail)}>
                       {selectedEmail.isStarred ? 'Unstar' : 'Star'}
                     </Button>
-                    <Button icon={<DeleteOutlined />} danger>Delete</Button>
+                    <Button icon={<DeleteOutlined />} danger onClick={(e) => handleDelete(e, selectedEmail)}>Delete</Button>
                   </Space>
 
                   {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
@@ -344,7 +456,7 @@ export default function InboxPage() {
                                 </Text>
                               </div>
                             </Space>
-                            <Button size="small">Download</Button>
+                            <Button size="small" onClick={() => handleDownloadAttachment(selectedEmail.id, attachment.id, attachment.filename)}>Download</Button>
                           </div>
                         ))}
                       </Space>
@@ -354,7 +466,7 @@ export default function InboxPage() {
                   <Card>
                     <div 
                       dangerouslySetInnerHTML={{ __html: selectedEmail.body }}
-                      style={{ lineHeight: '1.6' }}
+                      style={{ lineHeight: '1.6', overflowWrap: 'break-word' }}
                     />
                   </Card>
                 </Space>
@@ -368,6 +480,12 @@ export default function InboxPage() {
             )}
           </Content>
         </Layout>
+        
+        <ComposeModal 
+          visible={isComposeVisible} 
+          onCancel={handleComposeClose} 
+          onSend={handleComposeSend} 
+        />
       </Layout>
     </ProtectedRoute>
   );
