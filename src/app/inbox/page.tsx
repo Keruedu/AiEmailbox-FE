@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Layout, Menu, List, Card, Button, Badge, Typography, Space, Avatar, Spin, message, Empty } from 'antd';
+import { Layout, Menu, List, Card, Button, Badge, Typography, Space, Avatar, Spin, message, Empty, Modal } from 'antd';
+import EmailDetail from '@/app/components/EmailDetail';
 import ComposeModal from '@/components/ComposeModal';
 import {
   InboxOutlined,
@@ -16,7 +17,10 @@ import {
   PaperClipOutlined,
   ArrowLeftOutlined,
   EditOutlined,
+  AppstoreOutlined,
+  BarsOutlined,
 } from '@ant-design/icons';
+import KanbanBoard from '@/app/components/Kanban/KanbanBoard';
 import { useAuth } from '@/contexts/AuthContext';
 import { emailService } from '@/services/email';
 import { Mailbox, Email } from '@/types/email';
@@ -44,6 +48,19 @@ export default function InboxPage() {
   const [emailsLoading, setEmailsLoading] = useState(false);
   const [showMobileDetail, setShowMobileDetail] = useState(false);
   const [isComposeVisible, setIsComposeVisible] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+
+  useEffect(() => {
+    const savedView = localStorage.getItem('viewMode');
+    if (savedView === 'list' || savedView === 'kanban') {
+      setViewMode(savedView);
+    }
+  }, []);
+
+  const handleViewToggle = (mode: 'list' | 'kanban') => {
+    setViewMode(mode);
+    localStorage.setItem('viewMode', mode);
+  };
 
   const handleComposeClose = () => {
     setIsComposeVisible(false);
@@ -59,6 +76,8 @@ export default function InboxPage() {
   useEffect(() => {
     loadMailboxes();
   }, []);
+
+
 
   useEffect(() => {
     if (selectedMailbox) {
@@ -206,6 +225,22 @@ export default function InboxPage() {
     }
   };
 
+  const handleKanbanModalClose = () => {
+    setSelectedEmail(null);
+  };
+  
+  const handleKanbanCardClick = async (cardId: string) => {
+    try {
+       // Fetch full email details because Kanban card is partial
+       const fullEmail = await emailService.getEmailDetail(cardId);
+       setSelectedEmail(fullEmail);
+       // Modal will open because selectedEmail is set
+    } catch (error) {
+       message.error('Failed to load email details');
+       console.error(error);
+    }
+  };
+
   return (
     <ProtectedRoute>
       <Layout style={{ minHeight: '100vh' }}>
@@ -229,12 +264,61 @@ export default function InboxPage() {
             <Text className="header-user-email" style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user?.name || user?.email}
             </Text>
+            
+            <div className="flex bg-gray-100 p-1 rounded-lg mr-2">
+               <button 
+                  onClick={() => handleViewToggle('list')}
+                  className={`px-3 py-1 rounded-md text-sm font-medium border-0 cursor-pointer transition-all flex items-center ${viewMode === 'list' ? 'bg-white text-gray-800 shadow-sm' : 'bg-transparent text-gray-500 hover:text-gray-700'}`}
+               >
+                  <BarsOutlined className="mr-1" /> List
+               </button>
+               <button 
+                  onClick={() => handleViewToggle('kanban')}
+                  className={`px-3 py-1 rounded-md text-sm font-medium border-0 cursor-pointer transition-all flex items-center ${viewMode === 'kanban' ? 'bg-white text-gray-800 shadow-sm' : 'bg-transparent text-gray-500 hover:text-gray-700'}`}
+               >
+                  <AppstoreOutlined className="mr-1" /> Kanban
+               </button>
+            </div>
+
             <Button icon={<LogoutOutlined />} onClick={handleLogout}>
               Logout
             </Button>
           </Space>
         </Header>
 
+        {viewMode === 'kanban' ? (
+          <Content style={{ height: 'calc(100vh - 64px)', overflow: 'hidden', background: '#fff' }}>
+             <KanbanBoard onCardClick={handleKanbanCardClick} />
+             
+             {/* Modal for Kanban Detail View */}
+             <Modal
+                title={null}
+                footer={null}
+                open={!!selectedEmail}
+                onCancel={handleKanbanModalClose}
+                width={1000} // Wide modal to mimic list view detail
+                centered
+                destroyOnClose
+                styles={{ body: { padding: 0, height: '80vh', overflow: 'hidden' } }}
+             >
+                <div className="h-full overflow-y-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                {selectedEmail && (
+                   <EmailDetail 
+                       email={selectedEmail} 
+                       onBack={handleKanbanModalClose} // "Back" button also acts as close
+                       onStar={handleStar}
+                       onDelete={(e, email) => {
+                           handleDelete(e, email);
+                           handleKanbanModalClose(); // Close modal on delete
+                       }}
+                       onDownloadAttachment={handleDownloadAttachment}
+                       showMobileDetail={false} 
+                   />
+                )}
+                </div>
+             </Modal>
+          </Content>
+        ) : (
         <Layout className="main-layout">
           {/* Left Sidebar - Mailboxes */}
           <Sider 
@@ -366,15 +450,17 @@ export default function InboxPage() {
           </Layout>
 
           {/* Right - Email Detail */}
-          <Content 
+            <Content 
             style={{ 
               background: '#fff', 
               padding: showMobileDetail ? '0' : '24px',
               overflow: 'auto',
               height: 'calc(100vh - 64px)',
-              display: showMobileDetail ? 'block' : undefined // On desktop, it's flexed by Layout. On mobile, we toggle.
+              display: showMobileDetail ? 'block' : undefined, // On desktop, it's flexed by Layout. On mobile, we toggle.
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
             }}
-            className={`email-detail-content ${!showMobileDetail ? 'hidden-mobile' : ''}`}
+            className={`email-detail-content ${!showMobileDetail ? 'hidden-mobile' : ''} [&::-webkit-scrollbar]:hidden`}
           >
             {showMobileDetail && (
               <Button 
@@ -480,6 +566,7 @@ export default function InboxPage() {
             )}
           </Content>
         </Layout>
+        )}
         
         <ComposeModal 
           visible={isComposeVisible} 
