@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { RobotOutlined, ClockCircleOutlined, PaperClipOutlined } from '@ant-design/icons';
+import { Popover } from 'antd';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import dayjs from 'dayjs';
@@ -8,28 +9,11 @@ import { KanbanCardType, kanbanService } from '@/services/kanbanService';
 interface KanbanCardProps {
   card: KanbanCardType;
   onRefresh: () => void;
-  onClick: () => void;
+  onClick: (card: KanbanCardType) => void;
 }
 
-const SnoozePopover = ({ isOpen, onClose, onSnooze }: { isOpen: boolean; onClose: () => void; onSnooze: (date: string) => void }) => {
+const SnoozeContent = ({ onConfirm }: { onConfirm: (date: string) => void }) => {
   const [value, setValue] = useState('later_today');
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
 
   const handleConfirm = () => {
     let date = dayjs();
@@ -37,16 +21,11 @@ const SnoozePopover = ({ isOpen, onClose, onSnooze }: { isOpen: boolean; onClose
     if (value === 'tomorrow') date = date.add(1, 'day').startOf('day').add(9, 'hour');
     if (value === 'next_week') date = date.add(1, 'week').startOf('week').add(9, 'hour');
     if (value === '1_min') date = date.add(1, 'minute');
-    onSnooze(date.toISOString());
-    onClose();
+    onConfirm(date.toISOString());
   };
 
   return (
-    <div 
-      ref={ref}
-      className="absolute bottom-full right-0 mb-2 w-56 rounded-lg border border-gray-100 bg-white p-3 shadow-xl z-50"
-      onClick={(e) => e.stopPropagation()}
-    >
+    <div className="w-56 p-3">
       <h4 className="mb-2 text-sm font-semibold text-gray-700">Snooze Until</h4>
       <select 
         className="w-full rounded border border-gray-200 p-1.5 text-sm mb-2 focus:ring-2 focus:ring-blue-500 outline-none"
@@ -104,7 +83,7 @@ function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps) {
 
   const handleCardClick = () => {
       setIsRead(true);
-      onClick();
+      onClick(card);
   };
 
   const handleSummarize = async (e: React.MouseEvent) => {
@@ -134,6 +113,7 @@ function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps) {
   const handleSnooze = async (until: string) => {
     try {
       await kanbanService.snoozeCard(card.id, until);
+      setShowSnooze(false);
       onRefresh();
     } catch (err) {
       console.error(err);
@@ -210,14 +190,23 @@ function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps) {
                     <RobotOutlined />
                 </button>
                 <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); setShowSnooze(!showSnooze); }}
-                        className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                        title="Snooze"
+                    <Popover
+                        content={<SnoozeContent onConfirm={handleSnooze} />}
+                        trigger="click"
+                        open={showSnooze}
+                        onOpenChange={setShowSnooze}
+                        placement="bottomRight"
+                        overlayInnerStyle={{ padding: 0 }}
+                        destroyTooltipOnHide
                     >
-                        <ClockCircleOutlined />
-                    </button>
-                    <SnoozePopover isOpen={showSnooze} onClose={() => setShowSnooze(false)} onSnooze={handleSnooze} />
+                        <button 
+                            className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            title="Snooze"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <ClockCircleOutlined />
+                        </button>
+                    </Popover>
                 </div>
              </div>
          </div>

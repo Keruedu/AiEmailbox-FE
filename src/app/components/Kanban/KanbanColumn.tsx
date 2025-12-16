@@ -14,7 +14,7 @@ interface KanbanColumnProps {
   label: string;
   cards: KanbanCardType[];
   onRefresh: () => void;
-  onCardClick: (id: string) => void;
+  onCardClick: (card: KanbanCardType) => void;
 }
 
 const getColumnConfig = (id: string, label: string) => {
@@ -73,7 +73,7 @@ function KanbanColumn({ id, label, cards, onRefresh, onCardClick }: KanbanColumn
       >
         <SortableContext items={cards.map(c => c.id)} strategy={verticalListSortingStrategy}>
           {cards.map((card) => (
-            <KanbanCard key={card.id} card={card} onRefresh={onRefresh} onClick={() => onCardClick(card)} />
+            <KanbanCard key={card.id} card={card} onRefresh={onRefresh} onClick={onCardClick} />
           ))}
         </SortableContext>
         {cards.length === 0 && (
