@@ -35,6 +35,7 @@ export interface Email {
   attachments?: Attachment[];
   receivedAt: string;
   createdAt: string;
+  summary?: string;
 }
 
 export interface EmailListResponse {

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { RobotOutlined, ClockCircleOutlined, MoreOutlined, FileTextOutlined, EyeOutlined } from '@ant-design/icons';
+import { RobotOutlined, ClockCircleOutlined, PaperClipOutlined } from '@ant-design/icons';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import dayjs from 'dayjs';
@@ -82,12 +82,23 @@ export default function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps
   const [summary, setSummary] = useState(card.summary);
   const [showSnooze, setShowSnooze] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
+  const [isRead, setIsRead] = useState(card.is_read);
+
+  // Sync with prop if it changes
+  useEffect(() => {
+    setIsRead(card.is_read);
+  }, [card.is_read]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
     cursor: 'move',
+  };
+
+  const handleCardClick = () => {
+      setIsRead(true);
+      onClick();
   };
 
   const handleSummarize = async (e: React.MouseEvent) => {
@@ -123,27 +134,20 @@ export default function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps
     }
   };
 
-  // Extract initials and time
+  // Extract date formatted
   const senderName = card.sender || "Unknown";
-  const initials = senderName.substring(0, 2).toUpperCase();
   
   const dateObj = dayjs(card.received_at);
   const now = dayjs();
-  let timeStr = dateObj.format('MMM D');
+  let timeStr = dateObj.format('DD/MM/YYYY');
   
+  // Custom date formatting logic to match "26/10/2023" style or similar short format
   if (dateObj.isSame(now, 'day')) {
       timeStr = dateObj.format('h:mm A');
-  } else if (dateObj.isSame(now.subtract(1, 'day'), 'day')) {
-      timeStr = 'Yesterday';
   } else if (dateObj.isSame(now, 'year')) {
-      timeStr = dateObj.format('MMM D');
-  } else {
-      timeStr = dateObj.format('MMM D, YYYY');
+      timeStr = dateObj.format('DD/MM/YYYY');
   }
 
-  // Determine what content to show
-  // If summary exists and NOT showing original -> Show Summary
-  // Else -> Show Preview (or placeholder)
   const isShowingSummary = summary && !showOriginal;
 
   return (
@@ -152,92 +156,76 @@ export default function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps
       style={style} 
       {...attributes} 
       {...listeners}
-      className="group relative mb-4 w-full rounded-2xl bg-white p-5 shadow-sm hover:shadow-lg transition-all border border-gray-100 select-none cursor-grab active:cursor-grabbing"
+      // Use local isRead for immediate feedback
+      className={`group relative mb-3 w-full rounded-xl bg-white p-4 shadow-sm hover:shadow-md transition-all border border-gray-100 select-none cursor-grab active:cursor-grabbing border-l-[4px] ${isRead ? 'border-l-gray-300' : 'border-l-blue-500'}`}
     >
-      {/* Header: Avatar + Meta */}
-      <div className="mb-3 flex items-start justify-between">
-         <div className="flex items-center gap-3">
-             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600 font-bold text-sm">
-                 {initials}
-             </div>
-             <div>
-                 <h4 className="text-sm font-bold text-gray-800 leading-tight">{senderName}</h4>
-                 <span className="text-xs text-gray-400">{timeStr}</span>
-             </div>
-         </div>
-         <button className="text-gray-300 hover:text-gray-600">
-             <MoreOutlined />
-         </button>
+      {/* Header: Sender Name & Date */}
+      <div className="mb-2 flex items-center justify-between">
+          <h4 className={`text-sm font-bold text-black leading-tight truncate pr-2 ${!isRead ? 'text-black' : 'text-gray-800'}`}>
+              {senderName}
+          </h4>
+          <span className="text-xs text-gray-400 whitespace-nowrap">{timeStr}</span>
       </div>
 
-      {/* Content */}
-      <div className="mb-4">
-          <h3 className="text-base font-bold text-gray-900 mb-2 leading-snug">
+      {/* Subject */}
+      <div className="mb-2">
+          <h3 className={`text-base font-bold mb-1 leading-snug truncate ${!isRead ? 'text-black' : 'text-gray-800'}`}>
               {card.subject}
           </h3>
-          <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 leading-relaxed">
+          <div className="text-xs text-gray-500 leading-relaxed line-clamp-3">
              {isShowingSummary ? (
                  <>
-                   <span className="text-blue-600 font-semibold block mb-1">✨ AI Summary</span>
+                   <span className="text-blue-600 font-semibold mr-1">✨ AI Summary:</span>
                    {summary}
                  </>
              ) : (
-                 <span className="line-clamp-3 opacity-80">
-                    {/* Show Preview if available, else Card.summary (which might be empty if we are here), else fallback */}
-                    {card.preview || "No preview content"}
-                 </span>
+                 card.preview || "No content"
              )}
           </div>
       </div>
 
       {/* Footer Actions */}
-      <div className="flex items-center justify-between mt-2">
+      <div className="flex items-center justify-between mt-3 pt-2">
          <div className="flex items-center gap-2">
-           <button 
-              onClick={handleSummarize}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${isShowingSummary ? 'bg-green-100 text-green-700' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'}`}
-              title={loadingSummary ? "Generating..." : summary ? (showOriginal ? "View Summary" : "View Original") : "Summarize"}
-           >
-               {loadingSummary ? (
-                  <span>Loading...</span>
-               ) : summary ? (
-                  // If summary exists, toggle text
-                  showOriginal ? (
-                      <>
-                         <RobotOutlined /> Tóm tắt
-                      </>
-                  ) : (
-                      <>
-                         <FileTextOutlined /> Nội dung gốc
-                      </>
-                  )
-               ) : (
-                  <>
-                     <RobotOutlined /> Tóm tắt AI
-                  </>
-               )}
-           </button>
-           <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onClick();
-              }}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-           >
-              Xem chi tiết
-           </button>
+            {/* Attachment Badge */}
+            {card.has_attachments && (
+                <div className="flex items-center gap-1 bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-medium">
+                    <PaperClipOutlined /> File
+                </div>
+            )}
+            
+            {/* Functional Buttons - Minimalist */}
+             <div className="flex items-center gap-1">
+                <button 
+                  onClick={handleSummarize}
+                  className={`p-1.5 rounded transition-colors text-xs ${isShowingSummary ? 'bg-green-100 text-green-700' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'}`}
+                  title="Summarize"
+                >
+                    <RobotOutlined />
+                </button>
+                <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setShowSnooze(!showSnooze); }}
+                        className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                        title="Snooze"
+                    >
+                        <ClockCircleOutlined />
+                    </button>
+                    <SnoozePopover isOpen={showSnooze} onClose={() => setShowSnooze(false)} onSnooze={handleSnooze} />
+                </div>
+             </div>
          </div>
 
-         <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
-             <button 
-                onClick={() => setShowSnooze(!showSnooze)}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-             >
-                 <ClockCircleOutlined style={{ fontSize: '16px' }} />
-             </button>
-             <SnoozePopover isOpen={showSnooze} onClose={() => setShowSnooze(false)} onSnooze={handleSnooze} />
-         </div>
+         <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleCardClick();
+            }}
+            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+         >
+            Xem chi tiết
+         </button>
       </div>
     </div>
   );

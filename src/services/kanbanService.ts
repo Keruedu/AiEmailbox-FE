@@ -12,6 +12,8 @@ export interface KanbanCardType {
   gmail_url: string;
   snoozed_until?: string;
   received_at: string;
+  is_read: boolean;
+  has_attachments: boolean;
 }
 
 export interface ColMeta {

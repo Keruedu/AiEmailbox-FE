@@ -147,7 +147,14 @@ const EmailDetail: React.FC<EmailDetailProps> = ({
           <Card>
             <div
               dangerouslySetInnerHTML={{ __html: email.body }}
-              style={{ lineHeight: '1.6', overflowWrap: 'break-word' }}
+              className="email-body-content"
+              style={{ 
+                lineHeight: '1.6', 
+                overflowWrap: 'break-word', 
+                wordBreak: 'break-word',
+                maxWidth: '100%',
+                overflowX: 'auto'
+              }}
             />
           </Card>
         </Space>
