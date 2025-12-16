@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -13,20 +13,20 @@ import {
 import {
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
-import { 
-  ReloadOutlined 
+import {
+  ReloadOutlined
 } from '@ant-design/icons';
 import { KanbanCardType, ColMeta, kanbanService } from '@/services/kanbanService';
 import KanbanColumn from './KanbanColumn';
 import KanbanCard from './KanbanCard';
 
-export default function KanbanBoard({ onCardClick }: { onCardClick: (id: string) => void }) {
+export default function KanbanBoard({ onCardClick }: { onCardClick: (card: KanbanCardType) => void }) {
   const [columns, setColumns] = useState<Record<string, KanbanCardType[]>>({});
   const [meta, setMeta] = useState<ColMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
-  
+
   // Sorting & Filtering
   const [sortMode, setSortMode] = useState<'date-desc' | 'date-asc' | 'sender'>('date-desc');
   const [filters, setFilters] = useState({
@@ -45,17 +45,17 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (id: string)
     })
   );
 
-  const fetchBoard = async () => {
+  const fetchBoard = useCallback(async () => {
     setLoading(true);
     try {
       const [boardData, metaData] = await Promise.all([
         kanbanService.getKanban(),
         kanbanService.getMeta(),
       ]);
-      
+
       const incomingMeta = metaData.columns || [];
       const incomingCols = boardData.columns || {};
-      
+
       // Ensure all meta columns exist in state even if empty
       const finalCols: Record<string, KanbanCardType[]> = {};
       incomingMeta.forEach(m => {
@@ -75,11 +75,11 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (id: string)
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // Empty dependency array as setters are stable
 
   useEffect(() => {
     fetchBoard();
-  }, []);
+  }, [fetchBoard]);
 
   const findContainer = (id: string, cols: Record<string, KanbanCardType[]>) => {
     if (id in cols) {
@@ -100,13 +100,13 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (id: string)
     if (!over) return;
 
     const overId = over.id as string;
-    
+
     // Find source and destination containers
     // Note: over.id could be a container (column key) or an item ID
     // We treating column IDs as container IDs by direct match, or finding container if it's an item
     const activeContainer = findContainer(activeIdVal, columns);
     const overContainer = findContainer(overId, columns);
-    
+
     if (!activeContainer || !overContainer) return;
 
     if (activeContainer !== overContainer) {
@@ -120,10 +120,10 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (id: string)
       setColumns((prev) => {
         const sourceList = [...prev[activeContainer]];
         const destList = [...(prev[overContainer] || [])];
-        
+
         const itemIndex = sourceList.findIndex(c => c.id === activeIdVal);
         const [movedItem] = sourceList.splice(itemIndex, 1);
-        
+
         // If dropping on a card, insert before/after? For now just append or simplistic logic
         // But better is to just append if dropping on column, or rely on sorting strategy if full reorder implemented.
         // For simplicity: Append to new column. Backend doesn't support generic reordering *within* column yet (just status change).
@@ -157,6 +157,38 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (id: string)
      return null;
   };
 
+  // Process columns for display
+  const processedColumns = useMemo(() => {
+    const processed: Record<string, KanbanCardType[]> = {};
+
+    Object.keys(columns).forEach(key => {
+      let list = [...columns[key]];
+
+      // Filter
+      if (filters.unread) {
+         list = list.filter(card => !card.is_read);
+      }
+      if (filters.hasAttachment) {
+         list = list.filter(card => card.has_attachments);
+      }
+
+      // Sort
+      list.sort((a, b) => {
+        if (sortMode === 'date-desc') {
+           return new Date(b.received_at).getTime() - new Date(a.received_at).getTime();
+        } else if (sortMode === 'date-asc') {
+           return new Date(a.received_at).getTime() - new Date(b.received_at).getTime();
+        } else if (sortMode === 'sender') {
+           return a.sender.localeCompare(b.sender);
+        }
+        return 0;
+      });
+
+      processed[key] = list;
+    });
+    return processed;
+  }, [columns, filters, sortMode]);
+
   if (loading && meta.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-5">
@@ -170,7 +202,7 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (id: string)
       <div className="m-4 rounded-md bg-red-50 p-4 text-red-700">
          <div className="flex justify-between items-center">
             <span>{error}</span>
-            <button 
+            <button
               onClick={fetchBoard}
               className="px-3 py-1 bg-white border border-red-300 rounded hover:bg-red-50 text-sm"
             >
@@ -181,45 +213,11 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (id: string)
     );
   }
 
-  // Process columns for display
-  const getProcessedColumns = () => {
-    const processed: Record<string, KanbanCardType[]> = {};
-    
-    Object.keys(columns).forEach(key => {
-      let list = [...columns[key]];
-      
-      // Filter
-      if (filters.unread) {
-         list = list.filter(card => !card.is_read);
-      }
-      if (filters.hasAttachment) {
-         list = list.filter(card => card.has_attachments);
-      }
-      
-      // Sort
-      list.sort((a, b) => {
-        if (sortMode === 'date-desc') {
-           return new Date(b.received_at).getTime() - new Date(a.received_at).getTime();
-        } else if (sortMode === 'date-asc') {
-           return new Date(a.received_at).getTime() - new Date(b.received_at).getTime();
-        } else if (sortMode === 'sender') {
-           return a.sender.localeCompare(b.sender);
-        }
-        return 0;
-      });
-      
-      processed[key] = list;
-    });
-    return processed;
-  };
-
-  const processedColumns = getProcessedColumns();
-
   return (
     <div className="h-full overflow-x-auto p-5 bg-gray-50">
       {/* Controls Container */}
       <div className="mb-6 flex flex-wrap items-center gap-4 bg-white p-2 rounded-xl border border-gray-100 shadow-sm w-fit">
-         
+
          {/* Filter Section */}
          <div className="flex items-center gap-3 pl-2">
             <div className="flex items-center gap-2 text-gray-500 font-medium">

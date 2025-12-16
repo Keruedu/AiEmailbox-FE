@@ -43,7 +43,11 @@ const getColumnConfig = (id: string, label: string) => {
   return defaults;
 }
 
-export default function KanbanColumn({ id, label, cards, onRefresh, onCardClick }: KanbanColumnProps) {
+// ... imports remain the same
+
+export default React.memo(KanbanColumn);
+
+function KanbanColumn({ id, label, cards, onRefresh, onCardClick }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({ id });
   const config = getColumnConfig(id, label);
 
@@ -69,7 +73,7 @@ export default function KanbanColumn({ id, label, cards, onRefresh, onCardClick 
       >
         <SortableContext items={cards.map(c => c.id)} strategy={verticalListSortingStrategy}>
           {cards.map((card) => (
-            <KanbanCard key={card.id} card={card} onRefresh={onRefresh} onClick={() => onCardClick(card.id)} />
+            <KanbanCard key={card.id} card={card} onRefresh={onRefresh} onClick={() => onCardClick(card)} />
           ))}
         </SortableContext>
         {cards.length === 0 && (

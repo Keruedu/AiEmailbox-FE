@@ -17,6 +17,60 @@ interface SearchResultsProps {
   totalEstimate?: number;
 }
 
+const HighlightText = React.memo(({ text, highlight }: { text: string, highlight: string }) => {
+  const regex = React.useMemo(() => {
+    if (!highlight.trim()) return null;
+    const createFuzzyRegex = (query: string) => {
+        const charMap: Record<string, string> = {
+            'a': '[aàáạảãâầấậẩẫăằắặẳẵ]',
+            'e': '[eèéẹẻẽêềếệểễ]',
+            'i': '[iìíịỉĩ]',
+            'o': '[oòóọỏõôồốộổỗơờớợởỡ]',
+            'u': '[uùúụủũưừứựửữ]',
+            'y': '[yỳýỵỷỹ]',
+            'd': '[dđ]',
+        };
+        // Escape special regex chars in query to avoid crash
+        // But we are mapping each char... so special chars like '.' need to be escaped IF they are not in charMap.
+        // Actually split('') splits '.' separately.
+        // If char is '.', map returns '.'. regex sees '.'. Matches any char.
+        // We probably want to escape special chars that are NOT expanded.
+        // Simple escape: 
+        const escapeRegExp = (string: string) => {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+        
+        return query.toLowerCase().split('').map(char => {
+             // If char is in map, use map. Else escape it.
+             return charMap[char] || escapeRegExp(char);
+        }).join('');
+    };
+    const fuzzyPattern = createFuzzyRegex(highlight);
+    try {
+        return new RegExp(`(${fuzzyPattern})`, 'gi');
+    } catch (e) {
+        return null;
+    }
+  }, [highlight]);
+
+  if (!regex) return <span>{text}</span>;
+
+  // split limit? No.
+  const parts = text.split(regex);
+  return (
+    <span>
+      {parts.map((part, i) => 
+        regex.test(part) ? (
+          <span key={i} style={{ backgroundColor: '#ffbf00', fontWeight: 'bold' }}>{part}</span>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </span>
+  );
+});
+HighlightText.displayName = 'HighlightText';
+
 const SearchResults: React.FC<SearchResultsProps> = ({ 
   results, 
   loading, 
@@ -60,45 +114,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
           <>
           <List
             dataSource={safeResults}
-            renderItem={(email) => {
-              // Highlight helper
-              const HighlightText = ({ text, highlight }: { text: string, highlight: string }) => {
-                if (!highlight.trim()) {
-                  return <span>{text}</span>;
-                }
-                
-                // Create fuzzy regex for Vietnamese and simple typos
-                const createFuzzyRegex = (query: string) => {
-                    const charMap: Record<string, string> = {
-                        'a': '[aàáạảãâầấậẩẫăằắặẳẵ]',
-                        'e': '[eèéẹẻẽêềếệểễ]',
-                        'i': '[iìíịỉĩ]',
-                        'o': '[oòóọỏõôồốộổỗơờớợởỡ]',
-                        'u': '[uùúụủũưừứựửữ]',
-                        'y': '[yỳýỵỷỹ]',
-                        'd': '[dđ]',
-                    };
-                    return query.toLowerCase().split('').map(char => charMap[char] || char).join('');
-                };
-
-                const fuzzyPattern = createFuzzyRegex(highlight);
-                const regex = new RegExp(`(${fuzzyPattern})`, 'gi');
-                const parts = text.split(regex);
-                
-                return (
-                  <span>
-                    {parts.map((part, i) => 
-                      regex.test(part) ? (
-                        <span key={i} style={{ backgroundColor: '#ffbf00', fontWeight: 'bold' }}>{part}</span>
-                      ) : (
-                        <span key={i}>{part}</span>
-                      )
-                    )}
-                  </span>
-                );
-              };
-
-              return (
+            renderItem={(email) => (
               <Card
                 hoverable
                 style={{ marginBottom: '8px', cursor: 'pointer' }}
@@ -122,8 +138,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                     <HighlightText text={email.preview || email.summary || ''} highlight={searchQuery} />
                 </Text>
               </Card>
-              );
-            }}
+            )}
           />
           {hasMore && (
             <div style={{ textAlign: 'center', marginTop: '16px', paddingBottom: '20px' }}>

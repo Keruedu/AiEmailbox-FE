@@ -68,7 +68,13 @@ const SnoozePopover = ({ isOpen, onClose, onSnooze }: { isOpen: boolean; onClose
   );
 }
 
-export default function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps) {
+// ... imports remain the same
+
+// Export memoized component
+export default React.memo(KanbanCard);
+
+function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps) {
+  // ... implementation remains the same
   const {
     attributes,
     listeners,

@@ -130,9 +130,20 @@ export default function InboxPage() {
     setShowMobileDetail(false);
   };
 
-  const handleEmailSelect = (email: Email) => {
+  const handleEmailSelect = async (email: Email) => {
     setSelectedEmail(email);
     setShowMobileDetail(true);
+
+    // If body is missing (e.g. from metadata-only search), fetch full details
+    if (!email.body) {
+        try {
+            const fullEmail = await emailService.getEmailDetail(email.id);
+            setSelectedEmail(fullEmail);
+        } catch (error) {
+            console.error('Failed to load full email body', error);
+            message.error('Failed to load email content');
+        }
+    }
 
     if (!email.isRead) {
         // Optimistic update
@@ -255,15 +266,40 @@ export default function InboxPage() {
     setSelectedEmail(null);
   };
   
-  const handleKanbanCardClick = async (cardId: string) => {
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  const handleKanbanCardClick = async (card: import('@/services/kanbanService').KanbanCardType) => {
     try {
+        // Optimistic UI: Open modal immediately with available data
+        const partialEmail: Email = {
+            id: card.id,
+            mailboxId: selectedMailbox || 'INBOX', // best guess
+            from: { name: card.sender, email: '' }, // We don't have email address in board card yet
+            to: [],
+            subject: card.subject,
+            preview: card.preview,
+            body: '', // Empty body signals need to fetch
+            isRead: true, // Optimistically read
+            isStarred: false, // Unknown
+            hasAttachments: card.has_attachments,
+            receivedAt: card.received_at,
+            createdAt: card.received_at,
+            summary: card.summary
+        };
+        
+        setSelectedEmail(partialEmail);
+
        // Mark as read in backend
-       emailService.markAsRead(cardId); // Fire and forget or await? Await to ensure standard behavior
+       emailService.markAsRead(card.id); 
        
-       // Fetch full email details because Kanban card is partial
-       const fullEmail = await emailService.getEmailDetail(cardId);
-       setSelectedEmail(fullEmail);
-       // Modal will open because selectedEmail is set
+       // Fetch full email details
+       const fullEmail = await emailService.getEmailDetail(card.id);
+       
+       // Update selected email only if it's still the same one (user hasn't closed/switched)
+       setSelectedEmail(prev => (prev && prev.id === card.id ? fullEmail : prev));
+       
+       // Also update the item in the list if in list mode or just cache it
+       setEmails(prev => prev.map(e => e.id === card.id ? { ...e, isRead: true } : e));
+
     } catch (error) {
        message.error('Failed to load email details');
        console.error(error);
