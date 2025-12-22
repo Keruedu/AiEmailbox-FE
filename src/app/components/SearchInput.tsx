@@ -1,48 +1,108 @@
-import React, { useState } from 'react';
-import { SearchOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { SearchOutlined, UserOutlined, TagOutlined } from '@ant-design/icons';
+import { AutoComplete, Input } from 'antd';
+import type { SelectProps } from 'antd';
+import { searchService, Suggestion } from '@/services/searchService';
 
 interface SearchInputProps {
   onSearch: (query: string) => void;
   defaultValue?: string;
 }
 
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
+
 const SearchInput: React.FC<SearchInputProps> = ({ onSearch, defaultValue = '' }) => {
   const [value, setValue] = useState(defaultValue);
+  const [options, setOptions] = useState<SelectProps['options']>([]);
+  const [loading, setLoading] = useState(false);
+  const debouncedValue = useDebounce(value, 300);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
+
+  // Fetch suggestions when debounced value changes
+  useEffect(() => {
+    if (!debouncedValue || debouncedValue.trim().length < 2) {
+      setOptions([]);
+      return;
+    }
+
+    const fetchSuggestions = async () => {
+      setLoading(true);
+      try {
+        const suggestions = await searchService.getSuggestions(debouncedValue);
+        if (!isMounted.current) return;
+        
+        const mappedOptions = suggestions.map((s: Suggestion) => ({
+          value: s.text,
+          label: (
+            <div className="flex items-center gap-2">
+              {s.type === 'sender' ? (
+                <UserOutlined className="text-blue-500" />
+              ) : (
+                <TagOutlined className="text-green-500" />
+              )}
+              <span>{s.text}</span>
+              <span className="ml-auto text-xs text-gray-400">{s.type}</span>
+            </div>
+          ),
+        }));
+        setOptions(mappedOptions);
+      } catch (error) {
+        console.error('Failed to fetch suggestions:', error);
+        setOptions([]);
+      } finally {
+        if (isMounted.current) setLoading(false);
+      }
+    };
+
+    fetchSuggestions();
+  }, [debouncedValue]);
+
+  const handleSelect = useCallback((selectedValue: string) => {
+    setValue(selectedValue);
+    onSearch(selectedValue);
+  }, [onSearch]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      onSearch(value);
+    }
+  }, [onSearch, value]);
 
   return (
     <div className="header-search" style={{ flex: 1, maxWidth: '600px', minWidth: '200px' }}>
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <SearchOutlined style={{ position: 'absolute', left: '12px', color: '#999', fontSize: '16px' }} />
-        <input 
-          type="text" 
-          placeholder="Search emails..." 
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') onSearch(value);
-          }}
+      <AutoComplete
+        value={value}
+        options={options}
+        onSelect={handleSelect}
+        onChange={setValue}
+        style={{ width: '100%' }}
+        popupMatchSelectWidth={true}
+      >
+        <Input
+          placeholder="Search emails..."
+          prefix={<SearchOutlined style={{ color: loading ? '#1890ff' : '#999' }} />}
+          onKeyDown={handleKeyDown}
           style={{
-            width: '100%',
             height: '40px',
-            padding: '4px 12px 4px 40px',
             borderRadius: '20px',
-            border: '1px solid #e0e0e0',
-            backgroundColor: '#fff',
-            outline: 'none',
-            fontSize: '14px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            transition: 'all 0.3s'
+            paddingLeft: '12px',
           }}
-          onFocus={(e) => {
-             e.target.style.borderColor = '#1890ff';
-             e.target.style.boxShadow = '0 0 0 2px rgba(24,144,255,0.2)';
-          }}
-          onBlur={(e) => {
-             e.target.style.borderColor = '#e0e0e0';
-             e.target.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
-          }}
+          allowClear
         />
-      </div>
+      </AutoComplete>
     </div>
   );
 };

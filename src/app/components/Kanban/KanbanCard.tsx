@@ -67,12 +67,12 @@ function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps) {
   const [summary, setSummary] = useState(card.summary);
   const [showSnooze, setShowSnooze] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
-  const [isRead, setIsRead] = useState(card.is_read);
+  const [isRead, setIsRead] = useState(card.isRead);
 
   // Sync with prop if it changes
   useEffect(() => {
-    setIsRead(card.is_read);
-  }, [card.is_read]);
+    setIsRead(card.isRead);
+  }, [card.isRead]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -123,7 +123,7 @@ function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps) {
   // Extract date formatted
   const senderName = card.sender || "Unknown";
   
-  const dateObj = dayjs(card.received_at);
+  const dateObj = dayjs(card.receivedAt);
   const now = dayjs();
   let timeStr = dateObj.format('DD/MM/YYYY');
   
@@ -174,7 +174,7 @@ function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps) {
       <div className="flex items-center justify-between mt-3 pt-2">
          <div className="flex items-center gap-2">
             {/* Attachment Badge */}
-            {card.has_attachments && (
+            {card.hasAttachments && (
                 <div className="flex items-center gap-1 bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-medium">
                     <PaperClipOutlined /> File
                 </div>

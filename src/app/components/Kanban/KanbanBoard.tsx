@@ -14,11 +14,13 @@ import {
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
 import {
-  ReloadOutlined
+  ReloadOutlined,
+  SettingOutlined
 } from '@ant-design/icons';
 import { KanbanCardType, ColMeta, kanbanService } from '@/services/kanbanService';
 import KanbanColumn from './KanbanColumn';
 import KanbanCard from './KanbanCard';
+import KanbanSettingsModal from './KanbanSettingsModal';
 
 export default function KanbanBoard({ onCardClick }: { onCardClick: (card: KanbanCardType) => void }) {
   const [columns, setColumns] = useState<Record<string, KanbanCardType[]>>({});
@@ -26,6 +28,7 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (card: Kanba
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Sorting & Filtering
   const [sortMode, setSortMode] = useState<'date-desc' | 'date-asc' | 'sender'>('date-desc');
@@ -48,12 +51,20 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (card: Kanba
   const fetchBoard = useCallback(async () => {
     setLoading(true);
     try {
-      const [boardData, metaData] = await Promise.all([
+      const [boardData, columnsData] = await Promise.all([
         kanbanService.getKanban(),
-        kanbanService.getMeta(),
+        kanbanService.getColumns(),
       ]);
 
-      const incomingMeta = metaData.columns || [];
+      // Map KanbanColumn[] to ColMeta[]
+      // Sort by order to ensure correct display order
+      const incomingMeta: ColMeta[] = columnsData
+        .sort((a, b) => a.order - b.order)
+        .map(col => ({
+          key: col.key,
+          label: col.label
+        }));
+
       const incomingCols = boardData.columns || {};
 
       // Ensure all meta columns exist in state even if empty
@@ -166,18 +177,18 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (card: Kanba
 
       // Filter
       if (filters.unread) {
-         list = list.filter(card => !card.is_read);
+         list = list.filter(card => !card.isRead);
       }
       if (filters.hasAttachment) {
-         list = list.filter(card => card.has_attachments);
+         list = list.filter(card => card.hasAttachments);
       }
 
       // Sort
       list.sort((a, b) => {
         if (sortMode === 'date-desc') {
-           return new Date(b.received_at).getTime() - new Date(a.received_at).getTime();
+           return new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime();
         } else if (sortMode === 'date-asc') {
-           return new Date(a.received_at).getTime() - new Date(b.received_at).getTime();
+           return new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime();
         } else if (sortMode === 'sender') {
            return a.sender.localeCompare(b.sender);
         }
@@ -189,10 +200,18 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (card: Kanba
     return processed;
   }, [columns, filters, sortMode]);
 
+  // Loading Skeleton
   if (loading && meta.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center p-5">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600"></div>
+      <div className="flex gap-4 p-5 h-full overflow-hidden">
+        {[1, 2, 3].map(i => (
+           <div key={i} className="w-[320px] rounded-xl bg-gray-50 px-2 py-3 h-full flex flex-col gap-3">
+               <div className="h-8 w-1/2 bg-gray-200 rounded animate-pulse" />
+               <div className="h-24 w-full bg-white rounded-xl animate-pulse" />
+               <div className="h-24 w-full bg-white rounded-xl animate-pulse" />
+               <div className="h-24 w-full bg-white rounded-xl animate-pulse" />
+           </div>
+        ))}
       </div>
     );
   }
@@ -261,7 +280,7 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (card: Kanba
             <div className="relative">
                 <select 
                    value={sortMode}
-                   onChange={(e) => setSortMode(e.target.value as any)}
+                   onChange={(e) => setSortMode(e.target.value as 'date-desc' | 'date-asc' | 'sender')}
                    className="appearance-none bg-white border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-8 py-1.5 outline-none cursor-pointer hover:border-gray-300 transition-colors"
                 >
                     <option value="date-desc">Newest First</option>
@@ -274,11 +293,14 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (card: Kanba
             </div>
          </div>
          
-         <div className="ml-auto pl-2">
-             <button title="Refresh Board" onClick={fetchBoard} className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
-                 <ReloadOutlined spin={loading} />
-             </button>
-         </div>
+         <div className="ml-auto pl-2 flex items-center gap-2">
+              <button title="Board Settings" onClick={() => setSettingsOpen(true)} className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
+                  <SettingOutlined />
+              </button>
+              <button title="Refresh Board" onClick={fetchBoard} className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
+                  <ReloadOutlined spin={loading} />
+              </button>
+          </div>
       </div>
 
       <DndContext
@@ -304,6 +326,12 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (card: Kanba
            {renderActiveCard()}
         </DragOverlay>
       </DndContext>
+
+      <KanbanSettingsModal 
+        open={settingsOpen} 
+        onClose={() => setSettingsOpen(false)} 
+        onColumnsChanged={fetchBoard}
+      />
     </div>
   );
 }

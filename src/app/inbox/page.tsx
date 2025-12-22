@@ -25,6 +25,7 @@ import SearchResults from '@/app/components/SearchResults';
 import SearchInput from '@/app/components/SearchInput';
 import { useAuth } from '@/contexts/AuthContext';
 import { emailService } from '@/services/email';
+import { searchService } from '@/services/searchService';
 import apiClient from '@/services/api';
 import { Mailbox, Email } from '@/types/email';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -61,6 +62,8 @@ export default function InboxPage() {
   const [nextPageToken, setNextPageToken] = useState<string>('');
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalEstimate, setTotalEstimate] = useState<number>(0);
+  const [searchScores, setSearchScores] = useState<Record<string, number>>({});
+  const [searchMode, setSearchMode] = useState<'semantic' | 'text'>('semantic');
 
   useEffect(() => {
     const savedView = localStorage.getItem('viewMode');
@@ -87,6 +90,27 @@ export default function InboxPage() {
 
   useEffect(() => {
     loadMailboxes();
+  }, []);
+
+  // Auto-generate embeddings on first visit (once per session)
+  // Auto-generate embeddings periodically (every 2 minutes)
+  useEffect(() => {
+    const generate = () => {
+       searchService.generateEmbeddings(50) // Process small batches frequentyl
+        .then(result => {
+          if (result.processed > 0) {
+            console.log(`Auto-generated embeddings for ${result.processed} emails`);
+          }
+        })
+        .catch(err => console.error('Auto-embedding failed:', err));
+    };
+
+    // Initial call
+    generate();
+
+    // Loop
+    const interval = setInterval(generate, 2 * 60 * 1000); // 2 minutes
+    return () => clearInterval(interval);
   }, []);
 
 
@@ -280,9 +304,9 @@ export default function InboxPage() {
             body: '', // Empty body signals need to fetch
             isRead: true, // Optimistically read
             isStarred: false, // Unknown
-            hasAttachments: card.has_attachments,
-            receivedAt: card.received_at,
-            createdAt: card.received_at,
+            hasAttachments: card.hasAttachments,
+            receivedAt: card.receivedAt,
+            createdAt: card.receivedAt,
             summary: card.summary
         };
         
@@ -313,6 +337,7 @@ export default function InboxPage() {
       setSearchResults([]);
       setNextPageToken('');
       setTotalEstimate(0);
+      setSearchScores({});
       return;
     }
     
@@ -321,12 +346,24 @@ export default function InboxPage() {
     setSearchResults([]); 
     setNextPageToken('');
     setTotalEstimate(0);
+    setSearchScores({});
+    setSearchMode('semantic');
 
     try {
-      const result = await emailService.searchEmails(query);
-      setSearchResults(result.emails || []);
-      setNextPageToken(result.nextPageToken);
-      setTotalEstimate(result.totalEstimate);
+      const result = await searchService.semanticSearch(query, 20);
+      
+      // Extract emails and scores
+      const emails = result.results.map(r => r.email);
+      const scores: Record<string, number> = {};
+      result.results.forEach(r => {
+        scores[r.email.id] = r.score;
+      });
+      
+      setSearchResults(emails);
+      setSearchScores(scores);
+      setTotalEstimate(result.total);
+      // Semantic search doesn't use pagination tokens the same way
+      setNextPageToken(''); 
     } catch (error) {
        console.error('Search failed:', error);
        message.error('Search failed');
@@ -429,6 +466,8 @@ export default function InboxPage() {
                loadingMore={loadingMore}
                hasMore={!!nextPageToken}
                totalEstimate={totalEstimate}
+               scores={searchScores}
+               searchMode={searchMode}
             />
             {/* Reusing the Modal for details if an item is clicked from search results */}
              <Modal

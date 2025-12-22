@@ -1,6 +1,6 @@
 import React from 'react';
-import { List, Card, Typography, Space, Button, Empty } from 'antd';
-import { StarOutlined, PaperClipOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { List, Card, Typography, Space, Button, Empty, Tag } from 'antd';
+import { StarOutlined, PaperClipOutlined, ArrowLeftOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { Email } from '@/types/email';
 
 const { Text, Title } = Typography;
@@ -15,6 +15,10 @@ interface SearchResultsProps {
   loadingMore: boolean;
   hasMore: boolean;
   totalEstimate?: number;
+  /** Map of email.id -> semantic similarity score (0-1) */
+  scores?: Record<string, number>;
+  /** Label to show search mode */
+  searchMode?: 'semantic' | 'text';
 }
 
 const HighlightText = React.memo(({ text, highlight }: { text: string, highlight: string }) => {
@@ -80,7 +84,9 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   onLoadMore,
   loadingMore,
   hasMore,
-  totalEstimate
+  totalEstimate,
+  scores,
+  searchMode = 'text'
 }) => {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -88,6 +94,22 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   };
 
   const safeResults = results || [];
+
+  // Helper to render relevance badge
+  const renderRelevance = (emailId: string) => {
+    if (searchMode !== 'semantic' || !scores || scores[emailId] === undefined) return null;
+    const score = scores[emailId];
+    const percent = Math.round(score * 100);
+    let color = 'default';
+    if (percent >= 80) color = 'green';
+    else if (percent >= 60) color = 'blue';
+    else if (percent >= 40) color = 'orange';
+    return (
+      <Tag icon={<ThunderboltOutlined />} color={color}>
+        {percent}% match
+      </Tag>
+    );
+  };
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
@@ -97,6 +119,9 @@ const SearchResults: React.FC<SearchResultsProps> = ({
            <Title level={5} style={{ margin: 0 }}>
              Search results for &quot;{searchQuery}&quot;
            </Title>
+           {searchMode === 'semantic' && (
+             <Tag color="purple">AI Semantic</Tag>
+           )}
         </Space>
         {totalEstimate !== undefined ? (
              <Text type="secondary">Showing {safeResults.length}/{totalEstimate}</Text>
@@ -128,6 +153,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                     </Text>
                     {email.isStarred && <StarOutlined style={{ color: '#faad14' }} />}
                     {email.hasAttachments && <PaperClipOutlined />}
+                    {renderRelevance(email.id)}
                   </Space>
                   <Text type="secondary" style={{ fontSize: '12px' }}>{formatDate(email.receivedAt)}</Text>
                 </div>
