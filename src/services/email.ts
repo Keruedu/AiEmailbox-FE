@@ -36,6 +36,20 @@ export const emailService = {
     return response.data;
   },
 
+  // Search emails
+  searchEmails: async (query: string, pageToken?: string): Promise<{ emails: Email[], nextPageToken: string, totalEstimate: number }> => {
+    if (USE_MOCK_API) {
+      // Mock simple filter
+      const all = await mockEmailApi.getEmails('INBOX'); // simplified
+      const filtered = all.emails.filter(e => e.subject.toLowerCase().includes(query.toLowerCase()));
+      return { emails: filtered as unknown as Email[], nextPageToken: '', totalEstimate: filtered.length };
+    }
+    const response = await apiClient.get<{ emails: Email[], nextPageToken: string, totalEstimate: number }>('/emails/search', { 
+      params: { q: query, pageToken } 
+    });
+    return response.data;
+  },
+
   // Send email
   sendEmail: async (to: string, subject: string, body: string): Promise<void> => {
     if (USE_MOCK_API) {

@@ -21,8 +21,12 @@ import {
   BarsOutlined,
 } from '@ant-design/icons';
 import KanbanBoard from '@/app/components/Kanban/KanbanBoard';
+import SearchResults from '@/app/components/SearchResults';
+import SearchInput from '@/app/components/SearchInput';
 import { useAuth } from '@/contexts/AuthContext';
 import { emailService } from '@/services/email';
+import { searchService } from '@/services/searchService';
+import apiClient from '@/services/api';
 import { Mailbox, Email } from '@/types/email';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import './inbox.css';
@@ -50,6 +54,17 @@ export default function InboxPage() {
   const [isComposeVisible, setIsComposeVisible] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Email[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [nextPageToken, setNextPageToken] = useState<string>('');
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalEstimate, setTotalEstimate] = useState<number>(0);
+  const [searchScores, setSearchScores] = useState<Record<string, number>>({});
+  const [searchMode, setSearchMode] = useState<'semantic' | 'text'>('semantic');
+
   useEffect(() => {
     const savedView = localStorage.getItem('viewMode');
     if (savedView === 'list' || savedView === 'kanban') {
@@ -75,6 +90,27 @@ export default function InboxPage() {
 
   useEffect(() => {
     loadMailboxes();
+  }, []);
+
+  // Auto-generate embeddings on first visit (once per session)
+  // Auto-generate embeddings periodically (every 2 minutes)
+  useEffect(() => {
+    const generate = () => {
+       searchService.generateEmbeddings(50) // Process small batches frequentyl
+        .then(result => {
+          if (result.processed > 0) {
+            console.log(`Auto-generated embeddings for ${result.processed} emails`);
+          }
+        })
+        .catch(err => console.error('Auto-embedding failed:', err));
+    };
+
+    // Initial call
+    generate();
+
+    // Loop
+    const interval = setInterval(generate, 2 * 60 * 1000); // 2 minutes
+    return () => clearInterval(interval);
   }, []);
 
 
@@ -118,9 +154,30 @@ export default function InboxPage() {
     setShowMobileDetail(false);
   };
 
-  const handleEmailSelect = (email: Email) => {
+  const handleEmailSelect = async (email: Email) => {
     setSelectedEmail(email);
     setShowMobileDetail(true);
+
+    // If body is missing (e.g. from metadata-only search), fetch full details
+    if (!email.body) {
+        try {
+            const fullEmail = await emailService.getEmailDetail(email.id);
+            setSelectedEmail(fullEmail);
+        } catch (error) {
+            console.error('Failed to load full email body', error);
+            message.error('Failed to load email content');
+        }
+    }
+
+    if (!email.isRead) {
+        // Optimistic update
+        setEmails(prev => prev.map(e => e.id === email.id ? { ...e, isRead: true } : e));
+        
+        // Mark as read in backend
+        emailService.markAsRead(email.id).catch(err => {
+            console.error('Failed to mark as read', err);
+        });
+    }
   };
 
   const handleRefresh = () => {
@@ -176,6 +233,7 @@ export default function InboxPage() {
       }
       message.success(email.isStarred ? 'Unstarred' : 'Starred');
     } catch (error) {
+      console.error('Star error:', error);
       message.error('Failed to update star');
     }
   };
@@ -191,27 +249,29 @@ export default function InboxPage() {
       }
       message.success('Email deleted');
     } catch (error) {
+      console.error('Delete error:', error);
       message.error('Failed to delete email');
     }
   };
 
   const handleDownloadAttachment = async (emailId: string, attachmentId: string, filename: string) => {
     try {
-      const url = emailService.getAttachmentUrl(emailId, attachmentId);
-      // For authenticated download, we might need to fetch with axios and create blob
-      // But for now, let's try opening in new tab if it works with cookie/session
-      // Since we use Bearer token, we need to fetch it.
+      // Use apiClient to leverage automatic auth header and token refresh mechanisms
+      // The URL returned by service includes the full path, but apiClient uses baseURL.
+      // We need to parse relative path or check if apiClient handles absolute URLs (it usually does if valid).
+      // However, emailService.getAttachmentUrl returns full URL from env. 
+      // Let's rely on apiClient handling absolute URL override or extract path.
+      // Easiest is to reconstruct relative path manually or just pass full URL if axios supports it (it does).
       
-      // Simple fetch implementation
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}` // Assuming we can get token
-        }
+      const url = emailService.getAttachmentUrl(emailId, attachmentId);
+      
+      // Axios request with blob response type
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const response = await apiClient.get(url, { 
+        responseType: 'blob'
       });
       
-      if (!response.ok) throw new Error('Download failed');
-      
-      const blob = await response.blob();
+      const blob = new Blob([response.data]);
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
@@ -221,6 +281,7 @@ export default function InboxPage() {
       window.URL.revokeObjectURL(downloadUrl);
       document.body.removeChild(a);
     } catch (error) {
+      console.error('Download error:', error);
       message.error('Failed to download attachment');
     }
   };
@@ -229,24 +290,120 @@ export default function InboxPage() {
     setSelectedEmail(null);
   };
   
-  const handleKanbanCardClick = async (cardId: string) => {
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  const handleKanbanCardClick = async (card: import('@/services/kanbanService').KanbanCardType) => {
     try {
-       // Fetch full email details because Kanban card is partial
-       const fullEmail = await emailService.getEmailDetail(cardId);
-       setSelectedEmail(fullEmail);
-       // Modal will open because selectedEmail is set
+        // Optimistic UI: Open modal immediately with available data
+        const partialEmail: Email = {
+            id: card.id,
+            mailboxId: selectedMailbox || 'INBOX', // best guess
+            from: { name: card.sender, email: '' }, // We don't have email address in board card yet
+            to: [],
+            subject: card.subject,
+            preview: card.preview,
+            body: '', // Empty body signals need to fetch
+            isRead: true, // Optimistically read
+            isStarred: false, // Unknown
+            hasAttachments: card.hasAttachments,
+            receivedAt: card.receivedAt,
+            createdAt: card.receivedAt,
+            summary: card.summary
+        };
+        
+        setSelectedEmail(partialEmail);
+
+       // Mark as read in backend
+       emailService.markAsRead(card.id); 
+       
+       // Fetch full email details
+       const fullEmail = await emailService.getEmailDetail(card.id);
+       
+       // Update selected email only if it's still the same one (user hasn't closed/switched)
+       setSelectedEmail(prev => (prev && prev.id === card.id ? fullEmail : prev));
+       
+       // Also update the item in the list if in list mode or just cache it
+       setEmails(prev => prev.map(e => e.id === card.id ? { ...e, isRead: true } : e));
+
     } catch (error) {
        message.error('Failed to load email details');
        console.error(error);
     }
   };
 
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    if (!query.trim()) {
+      setIsSearching(false);
+      setSearchResults([]);
+      setNextPageToken('');
+      setTotalEstimate(0);
+      setSearchScores({});
+      return;
+    }
+    
+    setIsSearching(true);
+    setSearchLoading(true);
+    setSearchResults([]); 
+    setNextPageToken('');
+    setTotalEstimate(0);
+    setSearchScores({});
+    setSearchMode('semantic');
+
+    try {
+      const result = await searchService.semanticSearch(query, 20);
+      
+      // Extract emails and scores
+      const emails = result.results.map(r => r.email);
+      const scores: Record<string, number> = {};
+      result.results.forEach(r => {
+        scores[r.email.id] = r.score;
+      });
+      
+      setSearchResults(emails);
+      setSearchScores(scores);
+      setTotalEstimate(result.total);
+      // Semantic search doesn't use pagination tokens the same way
+      setNextPageToken(''); 
+    } catch (error) {
+       console.error('Search failed:', error);
+       message.error('Search failed');
+    } finally {
+       setSearchLoading(false);
+    }
+  };
+
+  const handleLoadMoreSearch = async () => {
+    if (!nextPageToken || loadingMore) return;
+    
+    setLoadingMore(true);
+    try {
+        const result = await emailService.searchEmails(searchQuery, nextPageToken);
+        setSearchResults(prev => [...prev, ...(result.emails || [])]);
+        setNextPageToken(result.nextPageToken);
+        // Helper: Ensure estimate is consistent or use the one from first request?
+        // Usually pagination doesn't change estimate much, but good to update if backend sends it.
+        setTotalEstimate(result.totalEstimate); 
+    } catch (error) {
+        console.error('Load more failed:', error);
+        message.error('Failed to load more results');
+    } finally {
+        setLoadingMore(false);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setIsSearching(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    setTotalEstimate(0);
+  };
+
   return (
     <ProtectedRoute>
-      <Layout style={{ minHeight: '100vh' }}>
+      <Layout style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <Header className="inbox-header" style={{ 
           background: '#fff', 
-          padding: '0 16px', 
+          padding: '12px 16px', // Increased padding for 2 rows
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           display: 'flex',
           justifyContent: 'space-between',
@@ -254,40 +411,96 @@ export default function InboxPage() {
           zIndex: 1,
           height: 'auto',
           minHeight: '64px',
-          flexWrap: 'wrap'
+          flexWrap: 'wrap',
+          gap: '12px', // Add gap for wrapping
+          flexShrink: 0
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="header-title" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <MailOutlined style={{ fontSize: '24px', color: '#667eea' }} />
             <Title level={4} style={{ margin: 0, whiteSpace: 'nowrap' }}>AI Email Box</Title>
           </div>
-          <Space>
-            <Text className="header-user-email" style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.name || user?.email}
-            </Text>
-            
-            <div className="flex bg-gray-100 p-1 rounded-lg mr-2">
-               <button 
-                  onClick={() => handleViewToggle('list')}
-                  className={`px-3 py-1 rounded-md text-sm font-medium border-0 cursor-pointer transition-all flex items-center ${viewMode === 'list' ? 'bg-white text-gray-800 shadow-sm' : 'bg-transparent text-gray-500 hover:text-gray-700'}`}
-               >
-                  <BarsOutlined className="mr-1" /> List
-               </button>
-               <button 
-                  onClick={() => handleViewToggle('kanban')}
-                  className={`px-3 py-1 rounded-md text-sm font-medium border-0 cursor-pointer transition-all flex items-center ${viewMode === 'kanban' ? 'bg-white text-gray-800 shadow-sm' : 'bg-transparent text-gray-500 hover:text-gray-700'}`}
-               >
-                  <AppstoreOutlined className="mr-1" /> Kanban
-               </button>
-            </div>
 
-            <Button icon={<LogoutOutlined />} onClick={handleLogout}>
-              Logout
-            </Button>
-          </Space>
+          {/* Search Bar - will order change on mobile via CSS */}
+          {/* Search Bar */}
+          <SearchInput onSearch={handleSearch} defaultValue={searchQuery} />
+
+          <div className="header-actions">
+            <Space>
+              <Text className="header-user-email" style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user?.name || user?.email}
+              </Text>
+              
+              <div className="flex bg-gray-100 p-1 rounded-lg mr-2">
+                 <button 
+                    onClick={() => handleViewToggle('list')}
+                    className={`px-3 py-1 rounded-md text-sm font-medium border-0 cursor-pointer transition-all flex items-center ${viewMode === 'list' ? 'bg-white text-gray-800 shadow-sm' : 'bg-transparent text-gray-500 hover:text-gray-700'}`}
+                 >
+                    <BarsOutlined className="mr-1" />
+                    <span className="view-mode-text">List</span>
+                 </button>
+                 <button 
+                    onClick={() => handleViewToggle('kanban')}
+                    className={`px-3 py-1 rounded-md text-sm font-medium border-0 cursor-pointer transition-all flex items-center ${viewMode === 'kanban' ? 'bg-white text-gray-800 shadow-sm' : 'bg-transparent text-gray-500 hover:text-gray-700'}`}
+                 >
+                    <AppstoreOutlined className="mr-1" />
+                    <span className="view-mode-text">Kanban</span>
+                 </button>
+              </div>
+
+              <Button icon={<LogoutOutlined />} onClick={handleLogout}>
+                <span className="logout-text">Logout</span>
+              </Button>
+            </Space>
+          </div>
         </Header>
 
-        {viewMode === 'kanban' ? (
-          <Content style={{ height: 'calc(100vh - 64px)', overflow: 'hidden', background: '#fff' }}>
+        {isSearching ? (
+          <Content style={{ flex: 1, overflow: 'hidden' }}>
+            <SearchResults 
+               results={searchResults} 
+               loading={searchLoading} 
+               onSelect={handleEmailSelect} 
+               onClose={handleClearSearch}
+               searchQuery={searchQuery}
+               onLoadMore={handleLoadMoreSearch}
+               loadingMore={loadingMore}
+               hasMore={!!nextPageToken}
+               totalEstimate={totalEstimate}
+               scores={searchScores}
+               searchMode={searchMode}
+            />
+            {/* Reusing the Modal for details if an item is clicked from search results */}
+             <Modal
+                title={null}
+                footer={null}
+                open={!!selectedEmail}
+                onCancel={() => setSelectedEmail(null)} // Close detail only
+                width={1000} 
+                centered
+                destroyOnClose
+                styles={{ body: { padding: 0, height: '80vh', overflow: 'hidden' } }}
+             >
+                <div className="h-full overflow-y-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                {selectedEmail && (
+                   <EmailDetail 
+                       email={selectedEmail} 
+                       onBack={() => setSelectedEmail(null)}
+                       onStar={handleStar}
+                       onDelete={(e, email) => {
+                           handleDelete(e, email);
+                           setSelectedEmail(null);
+                           // Update search results? Ideally yes, but tricky without re-search
+                           setSearchResults(prev => prev.filter(p => p.id !== email.id));
+                       }}
+                       onDownloadAttachment={handleDownloadAttachment}
+                       showMobileDetail={false} 
+                   />
+                )}
+                </div>
+             </Modal>
+          </Content>
+        ) : viewMode === 'kanban' ? (
+          <Content style={{ flex: 1, overflow: 'hidden', background: '#fff' }}>
              <KanbanBoard onCardClick={handleKanbanCardClick} />
              
              {/* Modal for Kanban Detail View */}
@@ -319,13 +532,15 @@ export default function InboxPage() {
              </Modal>
           </Content>
         ) : (
-        <Layout className="main-layout">
+        <Layout className="main-layout" style={{ flex: 1, overflow: 'hidden' }}>
           {/* Left Sidebar - Mailboxes */}
           <Sider 
             width={250} 
             theme="light" 
             style={{ 
               borderRight: '1px solid #f0f0f0',
+              overflowY: 'auto', // Enable vertical scrolling
+              height: '100%',
               // On mobile: hide if detail is shown OR if email list is shown (technically list is always shown on mobile unless detail is open)
               // But we want Sider to be hidden on mobile generally unless toggled? 
               // For simplicity: Mobile view = Stack. 
@@ -378,7 +593,9 @@ export default function InboxPage() {
             style={{ 
               display: showMobileDetail ? 'none' : 'flex',
               borderRight: '1px solid #f0f0f0',
-              // On mobile, this should be visible if detail is NOT visible.
+              flexDirection: 'column',
+              height: '100%',
+              overflow: 'hidden'
             }}
             className="email-list-layout"
           >
@@ -388,7 +605,8 @@ export default function InboxPage() {
               borderBottom: '1px solid #f0f0f0',
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'center'
+              alignItems: 'center',
+              flexShrink: 0
             }}>
               <Title level={5} style={{ margin: 0 }}>
                 {mailboxes.find(m => m.id === selectedMailbox)?.name || 'Emails'}
@@ -398,7 +616,7 @@ export default function InboxPage() {
               </Button>
             </div>
             
-            <Content style={{ padding: '8px', overflow: 'auto', height: 'calc(100vh - 120px)' }}>
+            <Content style={{ padding: '8px', overflowY: 'auto', flex: 1 }}>
               {emailsLoading ? (
                 <div style={{ textAlign: 'center', padding: '48px' }}>
                   <Spin size="large" />
@@ -423,7 +641,10 @@ export default function InboxPage() {
                       <Space direction="vertical" style={{ width: '100%' }} size={4}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Space>
-                            <Text strong style={{ fontSize: '14px' }}>
+                            {!email.isRead && (
+                               <div className="w-2 h-2 rounded-full bg-blue-600" style={{ marginRight: -4 }} />
+                            )}
+                            <Text strong={!email.isRead} style={{ fontSize: '14px', color: !email.isRead ? '#262626' : '#595959' }}>
                               {email.from.name || email.from.email}
                             </Text>
                             <div onClick={(e) => handleStar(e, email)}>
@@ -454,11 +675,12 @@ export default function InboxPage() {
             style={{ 
               background: '#fff', 
               padding: showMobileDetail ? '0' : '24px',
-              overflow: 'auto',
-              height: 'calc(100vh - 64px)',
-              display: showMobileDetail ? 'block' : undefined, // On desktop, it's flexed by Layout. On mobile, we toggle.
+              overflowY: 'auto',
+              height: '100%',
+              display: showMobileDetail ? 'block' : undefined, 
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
+              flex: 1
             }}
             className={`email-detail-content ${!showMobileDetail ? 'hidden-mobile' : ''} [&::-webkit-scrollbar]:hidden`}
           >

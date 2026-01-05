@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Typography, Space, Avatar, Card, Empty } from 'antd';
+import { Button, Typography, Space, Avatar, Card, Empty, Spin } from 'antd';
 import {
   ArrowLeftOutlined,
   StarOutlined,
@@ -145,10 +145,23 @@ const EmailDetail: React.FC<EmailDetailProps> = ({
           )}
 
           <Card>
-            <div
-              dangerouslySetInnerHTML={{ __html: email.body }}
-              style={{ lineHeight: '1.6', overflowWrap: 'break-word' }}
-            />
+            {!email.body ? (
+                <div style={{ textAlign: 'center', padding: '20px' }}>
+                    <Spin size="large" tip="Loading content..." />
+                </div>
+            ) : (
+                <div
+                dangerouslySetInnerHTML={{ __html: email.body }}
+                className="email-body-content"
+                style={{ 
+                    lineHeight: '1.6', 
+                    overflowWrap: 'break-word', 
+                    wordBreak: 'break-word',
+                    maxWidth: '100%',
+                    overflowX: 'auto'
+                }}
+                />
+            )}
           </Card>
         </Space>
       </div>
