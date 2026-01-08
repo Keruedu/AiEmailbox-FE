@@ -101,7 +101,81 @@ npm run build
 npm start
 ```
 
-## 🔐 Authentication Flow
+## Docker Setup (Recommended)
+
+### Prerequisites
+
+- Docker
+- Docker Compose
+
+### Quick Start with Docker Compose
+
+The easiest way to run the frontend is using the included `docker-compose.yml`:
+
+```bash
+# 1. Navigate to the frontend directory
+cd AiEmailbox-FE
+
+# 2. Configure environment variables
+# Edit the .env file with your settings
+cp .env.example .env
+
+# 3. Start the frontend
+docker-compose up -d
+
+# 4. Check logs
+docker-compose logs -f
+
+# 5. The frontend will be available at http://localhost:3000
+```
+
+### Docker Compose Service
+
+The `docker-compose.yml` includes:
+
+- **Frontend Application** (`aiemailbox-frontend-next`)
+  - Port: 3000
+  - Built with Next.js standalone output
+  - Auto-restart enabled
+  - Environment variables from `.env` file
+
+### Useful Commands
+
+```bash
+# Start service in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop service
+docker-compose down
+
+# Rebuild image and restart (after code changes)
+docker-compose up -d --build
+
+# Check service status
+docker-compose ps
+
+# View container info
+docker inspect aiemailbox-frontend-next
+
+# Access container shell
+docker exec -it aiemailbox-frontend-next sh
+```
+
+### Environment Variables for Docker
+
+Configure the `.env` file in the AiEmailbox-FE directory:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8080/api
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-oauth-client-id
+NODE_ENV=production
+PORT=3000
+```
+
+## �🔐 Authentication Flow
 
 ### Login Process
 
