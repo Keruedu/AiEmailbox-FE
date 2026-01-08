@@ -132,6 +132,8 @@ export const clearTokens = () => {
   accessToken = null;
   if (typeof window !== 'undefined') {
     localStorage.removeItem('refreshToken');
+    // Dispatch custom logout event for multi-tab sync
+    window.dispatchEvent(new Event('logout'));
   }
 };
 
