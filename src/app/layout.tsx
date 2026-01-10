@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AntdRegistry } from '@ant-design/nextjs-registry';
 import { ConfigProvider } from 'antd';
+import OfflineIndicator from "@/components/OfflineIndicator";
+import PWARegister from "@/components/PWARegister";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,6 +20,27 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "AI Email Box - Secure Email Dashboard",
   description: "A modern email dashboard with authentication",
+  manifest: '/manifest.json',
+  themeColor: '#667eea',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'AI EmailBox',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'AI Email Box',
+    title: 'AI Email Box - Secure Email Dashboard',
+    description: 'A modern email dashboard with authentication and offline support',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'AI Email Box - Secure Email Dashboard',
+    description: 'A modern email dashboard with authentication and offline support',
+  },
 };
 
 export default function RootLayout({
@@ -27,10 +50,32 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <meta name="referrer" content="no-referrer-when-downgrade" />
+      <head>
+        <meta name="referrer" content="no-referrer-when-downgrade" />
+        <meta name="application-name" content="AI EmailBox" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="AI EmailBox" />
+        <meta name="format-detection" content="telephone=no" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="theme-color" content="#667eea" />
+        
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png" />
+        <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
+        <link rel="apple-touch-icon" sizes="72x72" href="/icons/icon-72x72.png" />
+        <link rel="apple-touch-icon" sizes="96x96" href="/icons/icon-96x96.png" />
+        <link rel="apple-touch-icon" sizes="128x128" href="/icons/icon-128x128.png" />
+        <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144x144.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png" />
+        <link rel="apple-touch-icon" sizes="384x384" href="/icons/icon-384x384.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <PWARegister />
         <AntdRegistry>
           <ConfigProvider
             theme={{
@@ -41,6 +86,7 @@ export default function RootLayout({
             }}
           >
             <AuthProvider>
+              <OfflineIndicator />
               {children}
             </AuthProvider>
           </ConfigProvider>
