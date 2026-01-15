@@ -55,6 +55,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
+  // Multi-tab logout sync
+  useEffect(() => {
+    // Listen for storage changes (logout from other tabs)
+    const handleStorageChange = (e: StorageEvent) => {
+      // When refreshToken is removed in another tab, logout this tab too
+      if (e.key === 'refreshToken' && e.newValue === null && user) {
+        console.log('Logout detected from another tab');
+        setUser(null);
+        router.push('/login');
+      }
+    };
+
+    // Listen for custom logout event (same tab logout)
+    const handleLogoutEvent = () => {
+      if (user) {
+        console.log('Logout event received');
+        setUser(null);
+        router.push('/login');
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('logout', handleLogoutEvent);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('logout', handleLogoutEvent);
+    };
+  }, [user, router]);
+
   const login = async (data: LoginRequest) => {
     try {
       const response = await authService.login(data);
