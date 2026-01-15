@@ -1,0 +1,14 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" rx="64" fill="#667eea"/>
+  
+  <!-- Email icon -->
+  <path d="M128 160C119.163 160 112 167.163 112 176V336C112 344.837 119.163 352 128 352H384C392.837 352 400 344.837 400 336V176C400 167.163 392.837 160 384 160H128Z" fill="white" stroke="white" stroke-width="8"/>
+  
+  <!-- Envelope flap -->
+  <path d="M112 176L256 272L400 176" stroke="#667eea" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- AI Sparkle -->
+  <circle cx="368" cy="192" r="24" fill="#fbbf24"/>
+  <path d="M368 168L372 184L388 188L372 192L368 208L364 192L348 188L364 184L368 168Z" fill="white"/>
+</svg>
