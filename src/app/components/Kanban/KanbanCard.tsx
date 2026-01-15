@@ -196,8 +196,8 @@ function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps) {
                         open={showSnooze}
                         onOpenChange={setShowSnooze}
                         placement="bottomRight"
-                        overlayInnerStyle={{ padding: 0 }}
-                        destroyTooltipOnHide
+                        styles={{ body: { padding: 0 } }}
+                        destroyOnHidden
                     >
                         <button 
                             className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"

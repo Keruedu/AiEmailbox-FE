@@ -30,6 +30,22 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (card: Kanba
   const [activeId, setActiveId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // Fetch only column metadata (lighter than full board)
+  const fetchColumnsMeta = useCallback(async () => {
+    try {
+      const columnsData = await kanbanService.getColumns();
+      const incomingMeta: ColMeta[] = columnsData
+        .sort((a, b) => a.order - b.order)
+        .map(col => ({
+          key: col.key,
+          label: col.label
+        }));
+      setMeta(incomingMeta);
+    } catch (err) {
+      console.error('Failed to fetch columns meta:', err);
+    }
+  }, []);
+
   // Sorting & Filtering
   const [sortMode, setSortMode] = useState<'date-desc' | 'date-asc' | 'sender'>('date-desc');
   const [filters, setFilters] = useState({
@@ -330,7 +346,7 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (card: Kanba
       <KanbanSettingsModal 
         open={settingsOpen} 
         onClose={() => setSettingsOpen(false)} 
-        onColumnsChanged={fetchBoard}
+        onColumnsChanged={fetchColumnsMeta}
       />
     </div>
   );

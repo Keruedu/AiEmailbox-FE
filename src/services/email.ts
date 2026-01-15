@@ -50,13 +50,54 @@ export const emailService = {
     return response.data;
   },
 
-  // Send email
-  sendEmail: async (to: string, subject: string, body: string): Promise<void> => {
+  // Send email with optional attachments
+  sendEmail: async (
+    to: string[], 
+    cc: string[], 
+    bcc: string[], 
+    subject: string, 
+    body: string,
+    threadId?: string,
+    attachments?: File[]
+  ): Promise<void> => {
     if (USE_MOCK_API) {
       // Mock implementation
       return;
     }
-    await apiClient.post('/emails/send', { to, subject, body });
+    
+    // If there are attachments, use FormData
+    if (attachments && attachments.length > 0) {
+      const formData = new FormData();
+      formData.append('to', JSON.stringify(to));
+      formData.append('cc', JSON.stringify(cc));
+      formData.append('bcc', JSON.stringify(bcc));
+      formData.append('subject', subject);
+      formData.append('body', body);
+      if (threadId) {
+        formData.append('threadId', threadId);
+      }
+      
+      // Add each file
+      attachments.forEach((file) => {
+        formData.append('attachments', file);
+      });
+      
+      await apiClient.post('/emails/send', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    } else {
+      // No attachments, use JSON
+      await apiClient.post('/emails/send', { 
+        to, 
+        cc, 
+        bcc, 
+        subject, 
+        body,
+        threadId
+      });
+    }
   },
 
   // Reply to email
