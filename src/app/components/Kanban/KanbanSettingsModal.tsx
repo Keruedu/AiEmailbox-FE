@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Input, Select, Space, message, Popconfirm, Empty, Spin, Tag, ColorPicker } from 'antd';
+import { Modal, Button, Input, Select, Space, message, Popconfirm, Empty, Spin, Tag, ColorPicker, Tooltip } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, HolderOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
@@ -28,6 +28,16 @@ const SortableColumnItem: React.FC<{
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit(column);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Popconfirm will handle the actual deletion
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -44,18 +54,28 @@ const SortableColumnItem: React.FC<{
           {column.isDefault && <Tag color="green">Default</Tag>}
         </div>
       </div>
-      <Space>
-        <Button size="small" icon={<EditOutlined />} onClick={() => onEdit(column)} />
-        <Popconfirm
-          title="Delete this column?"
-          onConfirm={() => onDelete(column.id)}
-          okText="Yes"
-          cancelText="No"
-          disabled={column.isDefault}
-        >
-          <Button size="small" icon={<DeleteOutlined />} danger disabled={column.isDefault} />
-        </Popconfirm>
-      </Space>
+      <div onClick={(e) => e.stopPropagation()}>
+        <Space>
+          <Button size="small" icon={<EditOutlined />} onClick={handleEditClick} />
+          <Tooltip title={column.isDefault ? "Default columns cannot be deleted" : ""}>
+            <Popconfirm
+              title="Delete this column?"
+              onConfirm={() => onDelete(column.id)}
+              okText="Yes"
+              cancelText="No"
+              disabled={column.isDefault}
+            >
+              <Button 
+                size="small" 
+                icon={<DeleteOutlined />} 
+                danger 
+                disabled={column.isDefault}
+                onClick={handleDeleteClick}
+              />
+            </Popconfirm>
+          </Tooltip>
+        </Space>
+      </div>
     </div>
   );
 };
@@ -113,7 +133,9 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
 
     // Save new order to backend
     try {
-      await kanbanService.reorderColumns(newOrder.map(c => c.id));
+      const updatedColumns = await kanbanService.reorderColumns(newOrder.map(c => c.id));
+      setColumns(updatedColumns.sort((a, b) => a.order - b.order));
+      // No need to refetch board, just notify meta changed
       onColumnsChanged();
     } catch (error) {
       console.error('Failed to reorder:', error);
@@ -128,8 +150,23 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
       return;
     }
     setSaving(true);
+    
+    // Optimistic update - create temporary column for immediate feedback
+    const tempId = `temp_${Date.now()}`;
+    const tempColumn = {
+      id: tempId,
+      key: newForm.label.toLowerCase().replace(/\s+/g, '_'),
+      label: newForm.label,
+      gmailLabel: newForm.gmailLabel,
+      color: newForm.color,
+      order: columns.length,
+      isDefault: false,
+      userId: ''
+    };
+    setColumns(prev => [...prev, tempColumn]);
+    
     try {
-      await kanbanService.createColumn({
+      const newColumn = await kanbanService.createColumn({
         label: newForm.label,
         gmailLabel: newForm.gmailLabel,
         color: newForm.color,
@@ -137,11 +174,14 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
       message.success('Column created');
       setNewForm({ label: '', gmailLabel: '', color: '' });
       setIsAdding(false);
-      fetchData();
+      // Replace temp column with real one
+      setColumns(prev => prev.map(col => col.id === tempId ? newColumn : col).sort((a, b) => a.order - b.order));
       onColumnsChanged();
     } catch (error) {
       console.error('Failed to create column:', error);
       message.error('Failed to create column');
+      // Revert optimistic update
+      setColumns(prev => prev.filter(col => col.id !== tempId));
     } finally {
       setSaving(false);
     }
@@ -155,14 +195,16 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
     }
     setSaving(true);
     try {
-      await kanbanService.updateColumn(editingColumn.id, {
+      const updated = await kanbanService.updateColumn(editingColumn.id, {
         label: editForm.label,
         gmailLabel: editForm.gmailLabel,
         color: editForm.color,
       });
       message.success('Column updated');
       setEditingColumn(null);
-      fetchData();
+      // Update local state with returned column
+      setColumns(prev => prev.map(col => col.id === updated.id ? updated : col).sort((a, b) => a.order - b.order));
+      // Only notify parent, no need to refetch board for metadata changes
       onColumnsChanged();
     } catch (error) {
       console.error('Failed to update column:', error);
@@ -173,14 +215,22 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
   };
 
   const handleDeleteColumn = async (id: string) => {
+    // Optimistic update - remove from UI immediately
+    const backup = columns;
+    setColumns(prev => prev.filter(col => col.id !== id));
+    
     try {
-      await kanbanService.deleteColumn(id);
+      const remainingColumns = await kanbanService.deleteColumn(id);
       message.success('Column deleted');
-      fetchData();
+      // Update with server response
+      setColumns(remainingColumns.sort((a, b) => a.order - b.order));
+      // Notify parent to refresh board (this removes column from board too)
       onColumnsChanged();
     } catch (error) {
       console.error('Failed to delete column:', error);
       message.error('Failed to delete column');
+      // Revert optimistic update
+      setColumns(backup);
     }
   };
 
@@ -207,7 +257,7 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
           overflowY: 'auto',
         }
       }}
-      destroyOnClose
+      destroyOnHidden
     >
       {loading ? (
         <div className="flex justify-center p-8"><Spin size="large" /></div>
@@ -272,7 +322,7 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
             open={!!editingColumn}
             onCancel={cancelEdit}
             footer={null}
-            destroyOnClose
+            destroyOnHidden
           >
             <Space direction="vertical" className="w-full">
               <label className="text-sm text-gray-600">Label</label>

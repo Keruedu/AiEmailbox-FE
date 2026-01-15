@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Layout, Menu, List, Card, Button, Badge, Typography, Space, Avatar, Spin, message, Empty, Modal } from 'antd';
+import { Layout, Menu, List, Card, Button, Badge, Typography, Space, Avatar, Spin, message, Empty, Modal, Pagination } from 'antd';
 import EmailDetail from '@/app/components/EmailDetail';
 import ComposeModal from '@/components/ComposeModal';
 import {
@@ -53,6 +53,13 @@ export default function InboxPage() {
   const [showMobileDetail, setShowMobileDetail] = useState(false);
   const [isComposeVisible, setIsComposeVisible] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [composeMode, setComposeMode] = useState<'compose' | 'reply' | 'forward'>('compose');
+  const [replyToEmail, setReplyToEmail] = useState<Email | null>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalEmails, setTotalEmails] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -79,13 +86,29 @@ export default function InboxPage() {
 
   const handleComposeClose = () => {
     setIsComposeVisible(false);
+    setComposeMode('compose');
+    setReplyToEmail(null);
   };
 
   const handleComposeSend = () => {
     setIsComposeVisible(false);
+    setComposeMode('compose');
+    setReplyToEmail(null);
     if (selectedMailbox === 'SENT') {
       loadEmails('SENT');
     }
+  };
+
+  const handleReply = (email: Email) => {
+    setReplyToEmail(email);
+    setComposeMode('reply');
+    setIsComposeVisible(true);
+  };
+
+  const handleForward = (email: Email) => {
+    setReplyToEmail(email);
+    setComposeMode('forward');
+    setIsComposeVisible(true);
   };
 
   useEffect(() => {
@@ -135,11 +158,13 @@ export default function InboxPage() {
     }
   };
 
-  const loadEmails = async (mailboxId: string) => {
+  const loadEmails = async (mailboxId: string, page: number = 1, perPage: number = pageSize) => {
     setEmailsLoading(true);
     try {
-      const data = await emailService.getEmails(mailboxId);
+      const data = await emailService.getEmails(mailboxId, page, perPage);
       setEmails(data.emails || []);
+      setTotalEmails(data.total || 0);
+      setCurrentPage(page);
       setSelectedEmail(null);
     } catch (error) {
       message.error('Failed to load emails');
@@ -149,8 +174,17 @@ export default function InboxPage() {
     }
   };
 
+  const handlePageChange = (page: number, size?: number) => {
+    const newPageSize = size || pageSize;
+    if (size && size !== pageSize) {
+      setPageSize(size);
+    }
+    loadEmails(selectedMailbox, page, newPageSize);
+  };
+
   const handleMailboxSelect = (mailboxId: string) => {
     setSelectedMailbox(mailboxId);
+    setCurrentPage(1); // Reset to page 1 when switching mailbox
     setShowMobileDetail(false);
   };
 
@@ -477,7 +511,7 @@ export default function InboxPage() {
                 onCancel={() => setSelectedEmail(null)} // Close detail only
                 width={1000} 
                 centered
-                destroyOnClose
+                destroyOnHidden
                 styles={{ body: { padding: 0, height: '80vh', overflow: 'hidden' } }}
              >
                 <div className="h-full overflow-y-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
@@ -492,6 +526,8 @@ export default function InboxPage() {
                            // Update search results? Ideally yes, but tricky without re-search
                            setSearchResults(prev => prev.filter(p => p.id !== email.id));
                        }}
+                       onReply={handleReply}
+                       onForward={handleForward}
                        onDownloadAttachment={handleDownloadAttachment}
                        showMobileDetail={false} 
                    />
@@ -511,7 +547,7 @@ export default function InboxPage() {
                 onCancel={handleKanbanModalClose}
                 width={1000} // Wide modal to mimic list view detail
                 centered
-                destroyOnClose
+                destroyOnHidden
                 styles={{ body: { padding: 0, height: '80vh', overflow: 'hidden' } }}
              >
                 <div className="h-full overflow-y-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
@@ -524,6 +560,8 @@ export default function InboxPage() {
                            handleDelete(e, email);
                            handleKanbanModalClose(); // Close modal on delete
                        }}
+                       onReply={handleReply}
+                       onForward={handleForward}
                        onDownloadAttachment={handleDownloadAttachment}
                        showMobileDetail={false} 
                    />
@@ -635,7 +673,7 @@ export default function InboxPage() {
                         backgroundColor: email.isRead ? '#fff' : '#f6f8fa',
                         borderLeft: selectedEmail?.id === email.id ? '3px solid #667eea' : '3px solid transparent'
                       }}
-                      bodyStyle={{ padding: '12px 16px' }}
+                      styles={{ body: { padding: '12px 16px' } }}
                       onClick={() => handleEmailSelect(email)}
                     >
                       <Space direction="vertical" style={{ width: '100%' }} size={4}>
@@ -666,6 +704,27 @@ export default function InboxPage() {
                     </Card>
                   )}
                 />
+              )}
+              
+              {/* Pagination */}
+              {!emailsLoading && emails.length > 0 && (
+                <div style={{ 
+                  padding: '16px', 
+                  textAlign: 'center',
+                  borderTop: '1px solid #f0f0f0',
+                  background: '#fff'
+                }}>
+                  <Pagination
+                    current={currentPage}
+                    total={totalEmails}
+                    pageSize={pageSize}
+                    onChange={handlePageChange}
+                    showSizeChanger
+                    showQuickJumper
+                    showTotal={(total, range) => `${range[0]}-${range[1]} of ${total} emails`}
+                    pageSizeOptions={['10', '20', '50', '100']}
+                  />
+                </div>
               )}
             </Content>
           </Layout>
@@ -730,9 +789,15 @@ export default function InboxPage() {
                   </div>
 
                   <Space wrap>
-                    <Button type="primary">Reply</Button>
-                    <Button>Reply All</Button>
-                    <Button>Forward</Button>
+                    <Button type="primary" onClick={() => selectedEmail && handleReply(selectedEmail)}>
+                      Reply
+                    </Button>
+                    <Button onClick={() => selectedEmail && handleReply(selectedEmail)}>
+                      Reply All
+                    </Button>
+                    <Button onClick={() => selectedEmail && handleForward(selectedEmail)}>
+                      Forward
+                    </Button>
                     <Button icon={<StarOutlined />} onClick={(e) => handleStar(e, selectedEmail)}>
                       {selectedEmail.isStarred ? 'Unstar' : 'Star'}
                     </Button>
@@ -772,9 +837,23 @@ export default function InboxPage() {
                   )}
 
                   <Card>
-                    <div 
-                      dangerouslySetInnerHTML={{ __html: selectedEmail.body }}
-                      style={{ lineHeight: '1.6', overflowWrap: 'break-word' }}
+                    <iframe
+                      srcDoc={selectedEmail.body}
+                      title="Email Content"
+                      style={{
+                        width: '100%',
+                        minHeight: '400px',
+                        border: 'none',
+                        overflow: 'hidden',
+                      }}
+                      sandbox="allow-same-origin"
+                      onLoad={(e) => {
+                        const iframe = e.target as HTMLIFrameElement;
+                        if (iframe.contentDocument) {
+                          const height = iframe.contentDocument.body.scrollHeight;
+                          iframe.style.height = `${Math.max(height + 20, 400)}px`;
+                        }
+                      }}
                     />
                   </Card>
                 </Space>
@@ -793,7 +872,17 @@ export default function InboxPage() {
         <ComposeModal 
           visible={isComposeVisible} 
           onCancel={handleComposeClose} 
-          onSend={handleComposeSend} 
+          onSend={handleComposeSend}
+          mode={composeMode}
+          originalEmail={replyToEmail ? {
+            id: replyToEmail.id,
+            threadId: replyToEmail.threadId,
+            from: replyToEmail.from,
+            to: replyToEmail.to,
+            subject: replyToEmail.subject,
+            body: replyToEmail.body,
+            receivedAt: replyToEmail.receivedAt
+          } : undefined}
         />
       </Layout>
     </ProtectedRoute>

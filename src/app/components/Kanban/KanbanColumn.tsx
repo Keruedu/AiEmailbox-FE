@@ -81,7 +81,7 @@ function KanbanColumn({ id, label, cards, onRefresh, onCardClick }: KanbanColumn
            <div className="mt-10 flex flex-col items-center justify-center">
              <Empty 
                 image={Empty.PRESENTED_IMAGE_SIMPLE} 
-                description={id === 'snoozed' ? 'Kéo thẻ vào đây' : 'No items'} 
+                description={id === 'snoozed' ? 'Drag cards here' : 'No items'} 
                 style={{ opacity: 0.5 }}
              />
            </div>

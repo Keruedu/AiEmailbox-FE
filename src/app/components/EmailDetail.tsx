@@ -15,6 +15,8 @@ interface EmailDetailProps {
   onBack: () => void;
   onStar: (e: React.MouseEvent, email: Email) => void;
   onDelete: (e: React.MouseEvent, email: Email) => void;
+  onReply?: (email: Email) => void;
+  onForward?: (email: Email) => void;
   onDownloadAttachment: (emailId: string, attachmentId: string, filename: string) => void;
   showMobileDetail: boolean;
   className?: string;
@@ -26,6 +28,8 @@ const EmailDetail: React.FC<EmailDetailProps> = ({
   onBack,
   onStar,
   onDelete,
+  onReply,
+  onForward,
   onDownloadAttachment,
   showMobileDetail,
   className,
@@ -94,9 +98,15 @@ const EmailDetail: React.FC<EmailDetailProps> = ({
           </div>
 
           <Space wrap>
-            <Button type="primary">Reply</Button>
-            <Button>Reply All</Button>
-            <Button>Forward</Button>
+            <Button type="primary" onClick={() => onReply && onReply(email)}>
+              Reply
+            </Button>
+            <Button onClick={() => onReply && onReply(email)}>
+              Reply All
+            </Button>
+            <Button onClick={() => onForward && onForward(email)}>
+              Forward
+            </Button>
             <Button icon={<StarOutlined />} onClick={(e) => onStar(e, email)}>
               {email.isStarred ? 'Unstar' : 'Star'}
             </Button>
@@ -150,16 +160,24 @@ const EmailDetail: React.FC<EmailDetailProps> = ({
                     <Spin size="large" tip="Loading content..." />
                 </div>
             ) : (
-                <div
-                dangerouslySetInnerHTML={{ __html: email.body }}
-                className="email-body-content"
-                style={{ 
-                    lineHeight: '1.6', 
-                    overflowWrap: 'break-word', 
-                    wordBreak: 'break-word',
-                    maxWidth: '100%',
-                    overflowX: 'auto'
-                }}
+                <iframe
+                  srcDoc={email.body}
+                  title="Email Content"
+                  style={{
+                    width: '100%',
+                    minHeight: '400px',
+                    border: 'none',
+                    overflow: 'hidden',
+                  }}
+                  sandbox="allow-same-origin"
+                  onLoad={(e) => {
+                    // Auto-resize iframe to content height
+                    const iframe = e.target as HTMLIFrameElement;
+                    if (iframe.contentDocument) {
+                      const height = iframe.contentDocument.body.scrollHeight;
+                      iframe.style.height = `${Math.max(height + 20, 400)}px`;
+                    }
+                  }}
                 />
             )}
           </Card>

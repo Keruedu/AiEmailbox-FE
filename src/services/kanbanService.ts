@@ -85,12 +85,14 @@ export const kanbanService = {
     return response.data;
   },
 
-  deleteColumn: async (id: string): Promise<void> => {
-    await apiClient.delete(`/kanban/columns/${id}`);
+  deleteColumn: async (id: string): Promise<KanbanColumn[]> => {
+    const response = await apiClient.delete<{ columns: KanbanColumn[] }>(`/kanban/columns/${id}`);
+    return response.data.columns || [];
   },
 
-  reorderColumns: async (columnIds: string[]): Promise<void> => {
-    await apiClient.post('/kanban/columns/reorder', { columnIds });
+  reorderColumns: async (columnIds: string[]): Promise<KanbanColumn[]> => {
+    const response = await apiClient.post<{ columns: KanbanColumn[] }>('/kanban/columns/reorder', { columnIds });
+    return response.data.columns || [];
   },
 
   // ========== Gmail Labels ==========

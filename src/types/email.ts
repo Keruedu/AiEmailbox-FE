@@ -21,6 +21,7 @@ export interface Attachment {
 
 export interface Email {
   id: string;
+  threadId?: string;
   mailboxId: string;
   from: EmailAddress;
   to: EmailAddress[];
