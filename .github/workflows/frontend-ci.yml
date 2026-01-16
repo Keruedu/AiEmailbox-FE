@@ -2,13 +2,9 @@ name: Frontend CI/CD
 
 on:
   push:
-    branches: [ main ]
-    paths:
-      - 'AiEmailbox-FE/**'
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
-    paths:
-      - 'AiEmailbox-FE/**'
+    branches: [ main, master ]
   workflow_dispatch: {}
 
 jobs:
