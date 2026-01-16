@@ -111,11 +111,9 @@ export default function InboxPage() {
     setIsComposeVisible(true);
   };
 
-  // Intentionally run once on mount; loadMailboxes has stable internal behavior
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadMailboxes();
-  }, []);
+  }, [loadMailboxes]);
 
   // Auto-generate embeddings on first visit (once per session)
   // Auto-generate embeddings periodically (every 2 minutes)
@@ -140,29 +138,27 @@ export default function InboxPage() {
 
 
 
-  // loadEmails is a local function; we intentionally run it when `selectedMailbox` changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (selectedMailbox) {
       loadEmails(selectedMailbox);
     }
-  }, [selectedMailbox]);
+  }, [selectedMailbox, loadEmails]);
 
-  const loadMailboxes = async () => {
+  const loadMailboxes = useCallback(async () => {
     try {
       const data = await emailService.getMailboxes();
       setMailboxes(data || []);
-      if (data && data.length > 0 && !selectedMailbox) {
+      if (data && data.length > 0) {
         const inbox = data.find(m => m.id === 'INBOX');
-        setSelectedMailbox(inbox ? 'INBOX' : data[0].id);
+        setSelectedMailbox(prev => prev || (inbox ? 'INBOX' : data[0].id));
       }
     } catch (error) {
       message.error('Failed to load mailboxes');
       console.error(error);
     }
-  };
+  }, [setMailboxes, setSelectedMailbox]);
 
-  const loadEmails = async (mailboxId: string, page: number = 1, perPage: number = pageSize) => {
+  const loadEmails = useCallback(async (mailboxId: string, page: number = 1, perPage: number = pageSize) => {
     setEmailsLoading(true);
     try {
       const data = await emailService.getEmails(mailboxId, page, perPage);
@@ -176,7 +172,7 @@ export default function InboxPage() {
     } finally {
       setEmailsLoading(false);
     }
-  };
+  }, [pageSize]);
 
   const handlePageChange = (page: number, size?: number) => {
     const newPageSize = size || pageSize;
