@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Layout, Menu, List, Card, Button, Badge, Typography, Space, Avatar, Spin, message, Empty, Modal, Pagination } from 'antd';
 import EmailDetail from '@/app/components/EmailDetail';
 import ComposeModal from '@/components/ComposeModal';
@@ -111,6 +111,36 @@ export default function InboxPage() {
     setIsComposeVisible(true);
   };
 
+  const loadMailboxes = useCallback(async () => {
+    try {
+      const data = await emailService.getMailboxes();
+      setMailboxes(data || []);
+      if (data && data.length > 0) {
+        const inbox = data.find(m => m.id === 'INBOX');
+        setSelectedMailbox(prev => prev || (inbox ? 'INBOX' : data[0].id));
+      }
+    } catch (error) {
+      message.error('Failed to load mailboxes');
+      console.error(error);
+    }
+  }, [setMailboxes, setSelectedMailbox]);
+
+  const loadEmails = useCallback(async (mailboxId: string, page: number = 1, perPage: number = pageSize) => {
+    setEmailsLoading(true);
+    try {
+      const data = await emailService.getEmails(mailboxId, page, perPage);
+      setEmails(data.emails || []);
+      setTotalEmails(data.total || 0);
+      setCurrentPage(page);
+      setSelectedEmail(null);
+    } catch (error) {
+      message.error('Failed to load emails');
+      console.error(error);
+    } finally {
+      setEmailsLoading(false);
+    }
+  }, [pageSize]);
+
   useEffect(() => {
     loadMailboxes();
   }, [loadMailboxes]);
@@ -143,36 +173,6 @@ export default function InboxPage() {
       loadEmails(selectedMailbox);
     }
   }, [selectedMailbox, loadEmails]);
-
-  const loadMailboxes = useCallback(async () => {
-    try {
-      const data = await emailService.getMailboxes();
-      setMailboxes(data || []);
-      if (data && data.length > 0) {
-        const inbox = data.find(m => m.id === 'INBOX');
-        setSelectedMailbox(prev => prev || (inbox ? 'INBOX' : data[0].id));
-      }
-    } catch (error) {
-      message.error('Failed to load mailboxes');
-      console.error(error);
-    }
-  }, [setMailboxes, setSelectedMailbox]);
-
-  const loadEmails = useCallback(async (mailboxId: string, page: number = 1, perPage: number = pageSize) => {
-    setEmailsLoading(true);
-    try {
-      const data = await emailService.getEmails(mailboxId, page, perPage);
-      setEmails(data.emails || []);
-      setTotalEmails(data.total || 0);
-      setCurrentPage(page);
-      setSelectedEmail(null);
-    } catch (error) {
-      message.error('Failed to load emails');
-      console.error(error);
-    } finally {
-      setEmailsLoading(false);
-    }
-  }, [pageSize]);
 
   const handlePageChange = (page: number, size?: number) => {
     const newPageSize = size || pageSize;
