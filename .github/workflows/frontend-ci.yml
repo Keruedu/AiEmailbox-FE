@@ -22,25 +22,25 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        working-directory: ./AiEmailbox-FE
+        working-directory: .
         run: npm ci
 
       - name: Lint
-        working-directory: ./AiEmailbox-FE
+        working-directory: .
         run: |
           if [ -f package.json ] && npm run | grep -q "lint"; then
             npm run lint --silent || true
           fi
 
       - name: Run tests
-        working-directory: ./AiEmailbox-FE
+        working-directory: .
         run: |
           if [ -f package.json ] && npm run | grep -q "test"; then
             npm test --silent || true
           fi
 
       - name: Build
-        working-directory: ./AiEmailbox-FE
+        working-directory: .
         run: npm run build --if-present
 
   publish-image:
