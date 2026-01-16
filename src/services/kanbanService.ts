@@ -36,14 +36,22 @@ const transformCard = (data: any): KanbanCardType => ({
 });
 
 export const kanbanService = {
-  getKanban: async () => {
-    const response = await apiClient.get<{ columns: Record<string, any[]> }>('/kanban');
+  getKanban: async (opts?: { unread?: boolean; hasAttachments?: boolean; sortBy?: string; sortOrder?: string }) => {
+    const params: Record<string, any> = {};
+    if (opts) {
+      if (opts.unread) params.unread = true;
+      if (opts.hasAttachments) params.hasAttachments = true;
+      if (opts.sortBy) params.sortBy = opts.sortBy;
+      if (opts.sortOrder) params.sortOrder = opts.sortOrder;
+    }
+
+    const response = await apiClient.get<{ columns: Record<string, any[]> }>('/kanban', { params });
     const columns: Record<string, KanbanCardType[]> = {};
-    
+
     Object.entries(response.data.columns || {}).forEach(([key, cards]) => {
       columns[key] = (cards || []).map(transformCard);
     });
-    
+
     return { columns };
   },
 
@@ -69,7 +77,7 @@ export const kanbanService = {
   },
 
   // ========== Column Configuration ==========
-  
+
   getColumns: async (): Promise<KanbanColumn[]> => {
     const response = await apiClient.get<{ columns: KanbanColumn[] }>('/kanban/columns');
     return response.data.columns || [];
@@ -96,7 +104,7 @@ export const kanbanService = {
   },
 
   // ========== Gmail Labels ==========
-  
+
   getGmailLabels: async (): Promise<GmailLabel[]> => {
     const response = await apiClient.get<{ labels: GmailLabel[] }>('/gmail/labels');
     return response.data.labels || [];
