@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Space, Tag, Descriptions, Alert, Divider, message } from 'antd';
-import { 
-  WifiOutlined, 
-  DisconnectOutlined, 
+import {
+  WifiOutlined,
+  DisconnectOutlined,
   ReloadOutlined,
   ClearOutlined,
   CheckCircleOutlined,
@@ -24,15 +24,11 @@ export default function PWATestPage() {
     }
     return false;
   });
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const [isClient] = useState(() => typeof window !== 'undefined');
 
   const refreshCacheInfo = async () => {
     if (!('caches' in window)) return;
-    
+
     try {
       const cacheNames = await caches.keys();
       const cacheData = await Promise.all(
@@ -225,13 +221,13 @@ export default function PWATestPage() {
       </Card>
 
       {/* Cache Information */}
-      <Card 
-        title="Cache Storage" 
+      <Card
+        title="Cache Storage"
         extra={
-          <Button 
-            type="primary" 
-            danger 
-            icon={<ClearOutlined />} 
+          <Button
+            type="primary"
+            danger
+            icon={<ClearOutlined />}
             onClick={handleClearCache}
           >
             Clear All Cache
@@ -253,10 +249,10 @@ export default function PWATestPage() {
             ))}
           </div>
         ) : (
-          <Alert 
-            message="No cache found" 
-            type="warning" 
-            showIcon 
+          <Alert
+            message="No cache found"
+            type="warning"
+            showIcon
           />
         )}
       </Card>
@@ -265,15 +261,15 @@ export default function PWATestPage() {
       {swRegistration && (
         <Card title="Service Worker Controls" className="mb-4">
           <Space>
-            <Button 
-              type="primary" 
-              icon={<ReloadOutlined />} 
+            <Button
+              type="primary"
+              icon={<ReloadOutlined />}
               onClick={handleUpdateSW}
             >
               Update Service Worker
             </Button>
-            <Button 
-              danger 
+            <Button
+              danger
               onClick={handleUnregisterSW}
             >
               Unregister Service Worker
