@@ -52,7 +52,7 @@ const HighlightText = React.memo(({ text, highlight }: { text: string, highlight
     const fuzzyPattern = createFuzzyRegex(highlight);
     try {
       return new RegExp(`(${fuzzyPattern})`, 'gi');
-    } catch (_e) {
+    } catch {
       return null;
     }
   }, [highlight]);

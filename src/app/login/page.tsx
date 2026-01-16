@@ -38,7 +38,8 @@ function LoginContent() {
     } catch (error: unknown) {
       let errorMessage = 'Authentication failed';
       if (axios.isAxiosError(error)) {
-        errorMessage = (error.response as any)?.data?.message || error.message;
+        const data = error.response?.data as { message?: string } | undefined;
+        errorMessage = data?.message || error.message;
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
@@ -57,7 +58,8 @@ function LoginContent() {
       } catch (error: unknown) {
         let errorMessage = 'Google authentication failed';
         if (axios.isAxiosError(error)) {
-          errorMessage = (error.response as any)?.data?.message || error.message;
+          const data = error.response?.data as { message?: string } | undefined;
+          errorMessage = data?.message || error.message;
         } else if (error instanceof Error) {
           errorMessage = error.message;
         }

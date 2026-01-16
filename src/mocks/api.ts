@@ -44,7 +44,7 @@ export const mockAuth = {
     };
   },
 
-  googleAuth: async (_token: string) => {
+  googleAuth: async () => {
     await delay(800);
 
     return {

@@ -111,6 +111,8 @@ export default function InboxPage() {
     setIsComposeVisible(true);
   };
 
+  // Intentionally run once on mount; loadMailboxes has stable internal behavior
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadMailboxes();
   }, []);
@@ -138,6 +140,8 @@ export default function InboxPage() {
 
 
 
+  // loadEmails is a local function; we intentionally run it when `selectedMailbox` changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (selectedMailbox) {
       loadEmails(selectedMailbox);
@@ -300,7 +304,6 @@ export default function InboxPage() {
       const url = emailService.getAttachmentUrl(emailId, attachmentId);
       
       // Axios request with blob response type
-      /* eslint-disable @typescript-eslint/no-explicit-any */
       const response = await apiClient.get(url, { 
         responseType: 'blob'
       });
@@ -324,7 +327,6 @@ export default function InboxPage() {
     setSelectedEmail(null);
   };
   
-  /* eslint-disable @typescript-eslint/no-unused-vars */
   const handleKanbanCardClick = async (card: import('@/services/kanbanService').KanbanCardType) => {
     try {
         // Optimistic UI: Open modal immediately with available data
