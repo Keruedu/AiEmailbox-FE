@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Layout, Menu, List, Card, Button, Badge, Typography, Space, Avatar, Spin, message, Empty, Modal, Pagination } from 'antd';
+import { Layout, Menu, List, Card, Button, Badge, Typography, Space, Avatar, Spin, message, Empty, Modal, Pagination, Dropdown } from 'antd';
 import EmailDetail from '@/app/components/EmailDetail';
 import ComposeModal from '@/components/ComposeModal';
 import {
@@ -19,6 +19,7 @@ import {
   EditOutlined,
   AppstoreOutlined,
   BarsOutlined,
+  ExportOutlined,
 } from '@ant-design/icons';
 import KanbanBoard from '@/app/components/Kanban/KanbanBoard';
 import SearchResults from '@/app/components/SearchResults';
@@ -249,42 +250,66 @@ export default function InboxPage() {
 
   const handleStar = async (e: React.MouseEvent, email: Email) => {
     e.stopPropagation();
-    try {
-      // Toggle star: if currently starred, we want to unstar (isStarred=false), so we pass false.
-      // Wait, toggleStar implementation: if isStarred=true -> add STARRED label.
-      // So if email.isStarred is true, we want to remove it.
-      // My service implementation: toggleStar(id, isStarred) -> if isStarred, add label.
-      // So we should pass !email.isStarred to set the new state.
-      await emailService.toggleStar(email.id, !email.isStarred);
+    
+    // Store original state for rollback
+    const originalStarred = email.isStarred;
+    const newStarred = !email.isStarred;
+    
+    // Optimistic update FIRST (instant UI feedback)
+    const updateEmails = (list: Email[]) => list.map(e =>
+      e.id === email.id ? { ...e, isStarred: newStarred } : e
+    );
+    setEmails(updateEmails(emails));
+    if (selectedEmail?.id === email.id) {
+      setSelectedEmail({ ...selectedEmail, isStarred: newStarred });
+    }
+    message.success(originalStarred ? 'Unstarred' : 'Starred');
 
-      // Optimistic update
-      const updateEmails = (list: Email[]) => list.map(e =>
-        e.id === email.id ? { ...e, isStarred: !e.isStarred } : e
-      );
-      setEmails(updateEmails(emails));
-      if (selectedEmail?.id === email.id) {
-        setSelectedEmail({ ...selectedEmail, isStarred: !selectedEmail.isStarred });
-      }
-      message.success(email.isStarred ? 'Unstarred' : 'Starred');
+    // Then sync with backend (in background)
+    try {
+      await emailService.toggleStar(email.id, newStarred);
     } catch (error) {
       console.error('Star error:', error);
-      message.error('Failed to update star');
+      message.error('Failed to update star, reverting...');
+      
+      // Rollback on failure
+      setEmails(prev => prev.map(e =>
+        e.id === email.id ? { ...e, isStarred: originalStarred } : e
+      ));
+      if (selectedEmail?.id === email.id) {
+        setSelectedEmail(prev => prev ? { ...prev, isStarred: originalStarred } : null);
+      }
     }
   };
 
   const handleDelete = async (e: React.MouseEvent, email: Email) => {
     e.stopPropagation();
+    
+    // Store original emails for rollback
+    const originalEmails = [...emails];
+    const emailIndex = emails.findIndex(em => em.id === email.id);
+    
+    // Optimistic update FIRST (instant UI feedback)
+    setEmails(emails.filter(e => e.id !== email.id));
+    if (selectedEmail?.id === email.id) {
+      setSelectedEmail(null);
+      setShowMobileDetail(false);
+    }
+    message.success('Email deleted');
+
+    // Then sync with backend (in background)
     try {
       await emailService.deleteEmail(email.id);
-      setEmails(emails.filter(e => e.id !== email.id));
-      if (selectedEmail?.id === email.id) {
-        setSelectedEmail(null);
-        setShowMobileDetail(false);
-      }
-      message.success('Email deleted');
     } catch (error) {
       console.error('Delete error:', error);
-      message.error('Failed to delete email');
+      message.error('Failed to delete email, restoring...');
+      
+      // Rollback on failure - restore the email
+      const restoredEmails = [...originalEmails];
+      if (emailIndex >= 0) {
+        restoredEmails.splice(emailIndex, 0, email);
+      }
+      setEmails(originalEmails);
     }
   };
 
@@ -458,10 +483,6 @@ export default function InboxPage() {
 
           <div className="header-actions">
             <Space>
-              <Text className="header-user-email" style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user?.name || user?.email}
-              </Text>
-
               <div className="flex bg-gray-100 p-1 rounded-lg mr-2">
                 <button
                   onClick={() => handleViewToggle('list')}
@@ -479,9 +500,40 @@ export default function InboxPage() {
                 </button>
               </div>
 
-              <Button icon={<LogoutOutlined />} onClick={handleLogout}>
-                <span className="logout-text">Logout</span>
-              </Button>
+              <Dropdown
+                menu={{
+                  items: [
+                    {
+                      key: 'user-info',
+                      label: (
+                        <div style={{ padding: '8px 0' }}>
+                          <Text strong>{user?.name || 'User'}</Text>
+                          <br />
+                          <Text type="secondary" style={{ fontSize: '12px' }}>{user?.email}</Text>
+                        </div>
+                      ),
+                      disabled: true,
+                    },
+                    { type: 'divider' },
+                    {
+                      key: 'logout',
+                      icon: <LogoutOutlined />,
+                      label: 'Logout',
+                      danger: true,
+                      onClick: handleLogout,
+                    },
+                  ],
+                }}
+                trigger={['click']}
+                placement="bottomRight"
+              >
+                <Avatar
+                  style={{ backgroundColor: '#667eea', cursor: 'pointer' }}
+                  size="default"
+                >
+                  {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
+                </Avatar>
+              </Dropdown>
             </Space>
           </div>
         </Header>
@@ -800,6 +852,16 @@ export default function InboxPage() {
                         {selectedEmail.isStarred ? 'Unstar' : 'Star'}
                       </Button>
                       <Button icon={<DeleteOutlined />} danger onClick={(e) => handleDelete(e, selectedEmail)}>Delete</Button>
+                      <Button 
+                        icon={<ExportOutlined />} 
+                        onClick={() => {
+                          const messageRef = selectedEmail.threadId || selectedEmail.id;
+                          window.open(`https://mail.google.com/mail/u/0/#inbox/${messageRef}`, '_blank', 'noopener,noreferrer');
+                        }}
+                        title="Open in Gmail"
+                      >
+                        Open in Gmail
+                      </Button>
                     </Space>
 
                     {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (

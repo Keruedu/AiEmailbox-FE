@@ -5,6 +5,7 @@ import {
   StarOutlined,
   DeleteOutlined,
   PaperClipOutlined,
+  ExportOutlined,
 } from '@ant-design/icons';
 import { Email } from '@/types/email';
 
@@ -39,6 +40,19 @@ const EmailDetail: React.FC<EmailDetailProps> = ({
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  // Generate Gmail URL for opening email in Gmail
+  const getGmailUrl = (email: Email) => {
+    // Use threadId if available for better thread context, otherwise use email id
+    const messageRef = email.threadId || email.id;
+    return `https://mail.google.com/mail/u/0/#inbox/${messageRef}`;
+  };
+
+  const handleOpenInGmail = () => {
+    if (email) {
+      window.open(getGmailUrl(email), '_blank', 'noopener,noreferrer');
+    }
   };
 
   if (!email) {
@@ -112,6 +126,13 @@ const EmailDetail: React.FC<EmailDetailProps> = ({
             </Button>
             <Button icon={<DeleteOutlined />} danger onClick={(e) => onDelete(e, email)}>
               Delete
+            </Button>
+            <Button 
+              icon={<ExportOutlined />} 
+              onClick={handleOpenInGmail}
+              title="Open in Gmail"
+            >
+              Open in Gmail
             </Button>
           </Space>
 

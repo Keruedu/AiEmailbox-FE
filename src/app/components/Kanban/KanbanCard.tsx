@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RobotOutlined, ClockCircleOutlined, PaperClipOutlined } from '@ant-design/icons';
+import { RobotOutlined, ClockCircleOutlined, PaperClipOutlined, LoadingOutlined } from '@ant-design/icons';
 import { Popover } from 'antd';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -63,7 +63,7 @@ function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps) {
     isDragging,
   } = useSortable({ id: card.id });
 
-  const [, setLoadingSummary] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(false);
   const [summary, setSummary] = useState(card.summary);
   const [showSnooze, setShowSnooze] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
@@ -158,7 +158,7 @@ function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps) {
         <h3 className={`text-base font-bold mb-1 leading-snug truncate ${!isRead ? 'text-black' : 'text-gray-800'}`}>
           {card.subject}
         </h3>
-        <div className="text-xs text-gray-500 leading-relaxed line-clamp-3">
+        <div className={`text-xs text-gray-500 leading-relaxed ${isShowingSummary ? '' : 'line-clamp-3'}`}>
           {isShowingSummary ? (
             <>
               <span className="text-blue-600 font-semibold mr-1">✨ AI Summary:</span>
@@ -184,10 +184,11 @@ function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps) {
           <div className="flex items-center gap-1">
             <button
               onClick={handleSummarize}
-              className={`p-1.5 rounded transition-colors text-xs ${isShowingSummary ? 'bg-green-100 text-green-700' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'}`}
-              title="Summarize"
+              disabled={loadingSummary}
+              className={`p-1.5 rounded transition-colors text-xs ${loadingSummary ? 'bg-blue-100 text-blue-600 cursor-wait' : isShowingSummary ? 'bg-green-100 text-green-700' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'}`}
+              title={loadingSummary ? 'Generating summary...' : 'Summarize'}
             >
-              <RobotOutlined />
+              {loadingSummary ? <LoadingOutlined spin /> : <RobotOutlined />}
             </button>
             <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
               <Popover
