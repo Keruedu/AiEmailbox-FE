@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import axios from 'axios';
 import { Form, Input, Button, Card, Typography, message, Divider } from 'antd';
 import { MailOutlined, LockOutlined, UserOutlined, GoogleOutlined } from '@ant-design/icons';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,15 +28,21 @@ function LoginContent() {
         await login({ email: values.email, password: values.password });
         message.success('Login successful!');
       } else {
-        await signup({ 
-          email: values.email, 
-          password: values.password, 
+        await signup({
+          email: values.email,
+          password: values.password,
           name: values.name || ""
         });
         message.success('Signup successful!');
       }
     } catch (error: unknown) {
-      const errorMessage = (error as any).response?.data?.message || (error as Error).message || 'Authentication failed';
+      let errorMessage = 'Authentication failed';
+      if (axios.isAxiosError(error)) {
+        const data = error.response?.data as { message?: string } | undefined;
+        errorMessage = data?.message || error.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       message.error(errorMessage);
     } finally {
       setLoading(false);
@@ -49,7 +56,13 @@ function LoginContent() {
         await googleAuth({ token: codeResponse.code });
         message.success('Google authentication successful!');
       } catch (error: unknown) {
-        const errorMessage = (error as any).response?.data?.message || 'Google authentication failed';
+        let errorMessage = 'Google authentication failed';
+        if (axios.isAxiosError(error)) {
+          const data = error.response?.data as { message?: string } | undefined;
+          errorMessage = data?.message || error.message;
+        } else if (error instanceof Error) {
+          errorMessage = error.message;
+        }
         message.error(errorMessage);
       } finally {
         setLoading(false);
@@ -147,10 +160,10 @@ function LoginContent() {
         </Divider>
 
         <div className="flex justify-center mb-6">
-          <Button 
-            icon={<GoogleOutlined />} 
-            onClick={() => googleLogin()} 
-            size="large" 
+          <Button
+            icon={<GoogleOutlined />}
+            onClick={() => googleLogin()}
+            size="large"
             block
             className="h-12 text-base flex items-center justify-center gap-2"
           >
