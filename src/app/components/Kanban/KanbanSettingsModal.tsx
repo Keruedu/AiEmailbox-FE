@@ -99,6 +99,18 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  // Check for duplicate Gmail labels
+  const getDuplicateLabelWarning = (gmailLabel: string, excludeColumnId?: string) => {
+    if (!gmailLabel) return null;
+    const duplicateColumns = columns.filter(col => 
+      col.gmailLabel === gmailLabel && col.id !== excludeColumnId
+    );
+    if (duplicateColumns.length > 0) {
+      return `Warning: Label "${gmailLabel}" is already used by column "${duplicateColumns[0].label}". Emails may appear in multiple columns.`;
+    }
+    return null;
+  };
+
   useEffect(() => {
     if (open) {
       fetchData();
@@ -300,8 +312,14 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
                   onChange={val => setNewForm(prev => ({ ...prev, gmailLabel: val }))}
                   allowClear
                   className="w-full"
+                  status={getDuplicateLabelWarning(newForm.gmailLabel) ? 'warning' : undefined}
                   options={gmailLabels.map(l => ({ value: l.id, label: `${l.name} (${l.type})` }))}
                 />
+                {getDuplicateLabelWarning(newForm.gmailLabel) && (
+                  <div className="text-yellow-600 text-xs mt-1 bg-yellow-50 p-2 rounded">
+                    ⚠️ {getDuplicateLabelWarning(newForm.gmailLabel)}
+                  </div>
+                )}
                 <Space>
                   <Button type="primary" icon={<SaveOutlined />} onClick={handleAddColumn} loading={saving}>
                     Save
@@ -337,8 +355,14 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
                 onChange={val => setEditForm(prev => ({ ...prev, gmailLabel: val }))}
                 allowClear
                 className="w-full"
+                status={getDuplicateLabelWarning(editForm.gmailLabel, editingColumn?.id) ? 'warning' : undefined}
                 options={gmailLabels.map(l => ({ value: l.id, label: `${l.name} (${l.type})` }))}
               />
+              {getDuplicateLabelWarning(editForm.gmailLabel, editingColumn?.id) && (
+                <div className="text-yellow-600 text-xs mt-1 bg-yellow-50 p-2 rounded">
+                  ⚠️ {getDuplicateLabelWarning(editForm.gmailLabel, editingColumn?.id)}
+                </div>
+              )}
               <label className="text-sm text-gray-600">Color (optional)</label>
               <ColorPicker
                 value={editForm.color || '#1890ff'}

@@ -19,6 +19,7 @@ export interface KanbanCardType {
 export interface ColMeta {
   key: string;
   label: string;
+  color?: string;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

@@ -16,6 +16,7 @@ import { Empty } from 'antd';
 interface KanbanColumnProps {
   id: string;
   label: string;
+  color?: string;
   cards: KanbanCardType[];
   onRefresh: () => void;
   onCardClick: (card: KanbanCardType) => void;
@@ -48,12 +49,16 @@ const getColumnConfig = (id: string, label: string) => {
 
 export default React.memo(KanbanColumn);
 
-function KanbanColumn({ id, label, cards, onRefresh, onCardClick }: KanbanColumnProps) {
+function KanbanColumn({ id, label, color, cards, onRefresh, onCardClick }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({ id });
   const config = getColumnConfig(id, label);
+  
+  // Use custom color if provided, otherwise use default
+  const bgStyle = color ? { backgroundColor: color } : undefined;
+  const bgClass = color ? '' : config.bg;
 
   return (
-    <div className={`flex h-full w-[320px] shrink-0 flex-col rounded-xl px-2 py-3 ${config.bg}`}>
+    <div className={`flex h-full w-[320px] shrink-0 flex-col rounded-xl px-2 py-3 ${bgClass}`} style={bgStyle}>
       {/* Header */}
       <div className="mb-4 flex items-center justify-between px-2">
         <div className="flex items-center gap-2">

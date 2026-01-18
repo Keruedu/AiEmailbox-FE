@@ -38,7 +38,8 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (card: Kanba
         .sort((a, b) => a.order - b.order)
         .map(col => ({
           key: col.key,
-          label: col.label
+          label: col.label,
+          color: col.color
         }));
       setMeta(incomingMeta);
     } catch (err) {
@@ -87,7 +88,8 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (card: Kanba
         .sort((a, b) => a.order - b.order)
         .map(col => ({
           key: col.key,
-          label: col.label
+          label: col.label,
+          color: col.color
         }));
 
       const incomingCols = boardData.columns || {};
@@ -311,6 +313,7 @@ export default function KanbanBoard({ onCardClick }: { onCardClick: (card: Kanba
               key={col.key}
               id={col.key}
               label={col.label}
+              color={col.color}
               cards={processedColumns[col.key] || []}
               onRefresh={fetchBoard}
               onCardClick={onCardClick}

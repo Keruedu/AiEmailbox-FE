@@ -158,7 +158,7 @@ function KanbanCard({ card, onRefresh, onClick }: KanbanCardProps) {
         <h3 className={`text-base font-bold mb-1 leading-snug truncate ${!isRead ? 'text-black' : 'text-gray-800'}`}>
           {card.subject}
         </h3>
-        <div className={`text-xs text-gray-500 leading-relaxed ${isShowingSummary ? '' : 'line-clamp-3'}`}>
+        <div className="text-xs text-gray-500 leading-relaxed line-clamp-3">
           {isShowingSummary ? (
             <>
               <span className="text-blue-600 font-semibold mr-1">✨ AI Summary:</span>
