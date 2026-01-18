@@ -75,8 +75,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./AiEmailbox-FE
-          file: ./AiEmailbox-FE/Dockerfile
+          context: .
+          file: ./Dockerfile
           push: true
           # Dùng biến env.OWNER_LC thay vì github.repository_owner
           tags: |
