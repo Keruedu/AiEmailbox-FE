@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Layout, Menu, List, Card, Button, Badge, Typography, Space, Avatar, Spin, message, Empty, Modal, Pagination, Dropdown } from 'antd';
+import { Layout, Menu, List, Card, Button, Badge, Typography, Space, Avatar, Spin, message, Empty, Modal, Pagination, Dropdown, Drawer } from 'antd';
 import EmailDetail from '@/app/components/EmailDetail';
 import ComposeModal from '@/components/ComposeModal';
 import {
@@ -20,6 +20,7 @@ import {
   AppstoreOutlined,
   BarsOutlined,
   ExportOutlined,
+  MenuOutlined,
 } from '@ant-design/icons';
 import KanbanBoard from '@/app/components/Kanban/KanbanBoard';
 import SearchResults from '@/app/components/SearchResults';
@@ -52,6 +53,7 @@ export default function InboxPage() {
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [emailsLoading, setEmailsLoading] = useState(false);
   const [showMobileDetail, setShowMobileDetail] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [isComposeVisible, setIsComposeVisible] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [composeMode, setComposeMode] = useState<'compose' | 'reply' | 'forward'>('compose');
@@ -218,14 +220,6 @@ export default function InboxPage() {
   const handleRefresh = () => {
     loadEmails(selectedMailbox);
     message.success('Refreshed');
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
   };
 
   const formatDate = (dateString: string) => {
@@ -473,6 +467,13 @@ export default function InboxPage() {
           flexShrink: 0
         }}>
           <div className="header-title" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              className="mobile-menu-btn"
+              onClick={() => setMobileDrawerOpen(true)}
+              style={{ padding: '8px', border: 'none', background: 'transparent', cursor: 'pointer', display: 'none' }}
+            >
+              <MenuOutlined style={{ fontSize: '20px', color: '#667eea' }} />
+            </button>
             <MailOutlined style={{ fontSize: '24px', color: '#667eea' }} />
             <Title level={4} style={{ margin: 0, whiteSpace: 'nowrap' }}>AI Email Box</Title>
           </div>
@@ -520,7 +521,7 @@ export default function InboxPage() {
                       icon: <LogoutOutlined />,
                       label: 'Logout',
                       danger: true,
-                      onClick: handleLogout,
+                      onClick: logout,
                     },
                   ],
                 }}
@@ -675,6 +676,53 @@ export default function InboxPage() {
                 }))}
               />
             </Sider>
+
+            {/* Mobile Drawer for Sidebar */}
+            <Drawer
+              title="Mailboxes"
+              placement="left"
+              onClose={() => setMobileDrawerOpen(false)}
+              open={mobileDrawerOpen}
+              width={280}
+              styles={{ body: { padding: 0 } }}
+            >
+              <div style={{ padding: '16px' }}>
+                <Button
+                  type="primary"
+                  icon={<EditOutlined />}
+                  block
+                  size="large"
+                  onClick={() => {
+                    setIsComposeVisible(true);
+                    setMobileDrawerOpen(false);
+                  }}
+                  style={{ marginBottom: '16px', borderRadius: '24px', height: '48px' }}
+                >
+                  Compose
+                </Button>
+              </div>
+              <Menu
+                mode="inline"
+                selectedKeys={[selectedMailbox]}
+                style={{ borderRight: 0 }}
+                items={mailboxes.map((mailbox) => ({
+                  key: mailbox.id,
+                  icon: iconMap[mailbox.icon] || <FolderOutlined />,
+                  onClick: () => {
+                    handleMailboxSelect(mailbox.id);
+                    setMobileDrawerOpen(false);
+                  },
+                  label: (
+                    <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                      <span>{mailbox.name}</span>
+                      {mailbox.unreadCount > 0 && (
+                        <Badge count={mailbox.unreadCount} style={{ backgroundColor: '#667eea' }} />
+                      )}
+                    </span>
+                  ),
+                }))}
+              />
+            </Drawer>
 
             {/* Middle - Email List */}
             <Layout

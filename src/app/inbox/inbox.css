@@ -17,30 +17,36 @@
   .header-user-email {
     display: none !important;
   }
-  
+
   /* Header specific mobile styles */
   .inbox-header {
-      padding: 12px !important;
+    padding: 12px !important;
   }
 
   .header-search {
-      order: 3;
-      width: 100%;
-      max-width: 100% !important;
-      margin: 8px 0 0 0 !important;
+    order: 3;
+    width: 100%;
+    max-width: 100% !important;
+    margin: 8px 0 0 0 !important;
   }
-  
+
   .header-title {
-      order: 1;
+    order: 1;
   }
-  
+
   .header-actions {
-      order: 2;
+    order: 2;
   }
-  
+
   /* Hide text labels on very small screens */
-  .view-mode-text, .logout-text {
-      display: none;
+  .view-mode-text,
+  .logout-text {
+    display: none;
+  }
+
+  /* Show hamburger menu button on mobile */
+  .mobile-menu-btn {
+    display: block !important;
   }
 }
 
@@ -58,8 +64,8 @@
 
 /* Email content iframe styles */
 .email-content-iframe {
-    width: 100%;
-    min-height: 400px;
-    border: none;
-    overflow: hidden;
+  width: 100%;
+  min-height: 400px;
+  border: none;
+  overflow: hidden;
 }

@@ -14,18 +14,23 @@ interface KanbanCardProps {
 
 const SnoozeContent = ({ onConfirm }: { onConfirm: (date: string) => void }) => {
   const [value, setValue] = useState('later_today');
+  const [customDate, setCustomDate] = useState('');
+  const [customTime, setCustomTime] = useState('09:00');
 
   const handleConfirm = () => {
     let date = dayjs();
     if (value === 'later_today') date = date.add(4, 'hour');
     if (value === 'tomorrow') date = date.add(1, 'day').startOf('day').add(9, 'hour');
     if (value === 'next_week') date = date.add(1, 'week').startOf('week').add(9, 'hour');
-    if (value === '1_min') date = date.add(1, 'minute');
+    if (value === 'custom' && customDate) {
+      const [hours, minutes] = customTime.split(':').map(Number);
+      date = dayjs(customDate).startOf('day').add(hours, 'hour').add(minutes, 'minute');
+    }
     onConfirm(date.toISOString());
   };
 
   return (
-    <div className="w-56 p-3">
+    <div className="w-64 p-3">
       <h4 className="mb-2 text-sm font-semibold text-gray-700">Snooze Until</h4>
       <select
         className="w-full rounded border border-gray-200 p-1.5 text-sm mb-2 focus:ring-2 focus:ring-blue-500 outline-none"
@@ -35,11 +40,31 @@ const SnoozeContent = ({ onConfirm }: { onConfirm: (date: string) => void }) => 
         <option value="later_today">Later Today (+4h)</option>
         <option value="tomorrow">Tomorrow morning</option>
         <option value="next_week">Next Week</option>
-        <option value="1_min">In 1 minute (Test)</option>
+        <option value="custom">Custom...</option>
       </select>
+      
+      {value === 'custom' && (
+        <div className="space-y-2 mb-2">
+          <input
+            type="date"
+            className="w-full rounded border border-gray-200 p-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            value={customDate}
+            onChange={(e) => setCustomDate(e.target.value)}
+            min={dayjs().format('YYYY-MM-DD')}
+          />
+          <input
+            type="time"
+            className="w-full rounded border border-gray-200 p-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            value={customTime}
+            onChange={(e) => setCustomTime(e.target.value)}
+          />
+        </div>
+      )}
+      
       <button
-        className="w-full rounded bg-blue-600 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+        className="w-full rounded bg-blue-600 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
         onClick={handleConfirm}
+        disabled={value === 'custom' && !customDate}
       >
         Confirm
       </button>
