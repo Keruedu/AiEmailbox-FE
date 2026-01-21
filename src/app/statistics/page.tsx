@@ -5,6 +5,7 @@ import { Card, Row, Col, Statistic, Segmented, Spin, Typography, Space, Alert, B
 import { MailOutlined, EyeOutlined, StarOutlined, PieChartOutlined, ArrowLeftOutlined, LogoutOutlined, InboxOutlined } from '@ant-design/icons';
 import { StatusPieChart, EmailTrendChart, TopSendersChart, ActivityHeatmap } from '@/components/statistics';
 import { statisticsService } from '@/services/statisticsService';
+import { kanbanService, KanbanColumn } from '@/services/kanbanService';
 import { StatisticsResponse } from '@/types/statistics';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,14 +20,22 @@ function StatisticsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<StatisticsResponse | null>(null);
+  const [columns, setColumns] = useState<KanbanColumn[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await statisticsService.getStatistics(period);
-        setData(response);
+
+        // Fetch statistics and columns in parallel
+        const [statsResponse, columnsResponse] = await Promise.all([
+          statisticsService.getStatistics(period),
+          kanbanService.getColumns(),
+        ]);
+
+        setData(statsResponse);
+        setColumns(columnsResponse);
       } catch (err) {
         setError('Failed to load statistics. Please try again.');
         console.error('Error fetching statistics:', err);
@@ -195,7 +204,7 @@ function StatisticsContent() {
                   <Spin size="large" />
                 </div>
               ) : (
-                <StatusPieChart data={data?.statusStats ?? []} />
+                <StatusPieChart data={data?.statusStats ?? []} columns={columns} />
               )}
             </div>
           </Card>
