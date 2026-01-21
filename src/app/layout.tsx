@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AntdRegistry } from '@ant-design/nextjs-registry';
@@ -17,11 +17,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: '#667eea',
+};
+
 export const metadata: Metadata = {
   title: "AI Email Box - Secure Email Dashboard",
   description: "A modern email dashboard with authentication",
   manifest: '/manifest.json',
-  themeColor: '#667eea',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

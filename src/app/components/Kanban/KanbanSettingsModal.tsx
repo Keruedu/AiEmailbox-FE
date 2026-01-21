@@ -1,8 +1,18 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Input, Select, Space, message, Popconfirm, Empty, Spin, Tag, ColorPicker, Tooltip } from 'antd';
-import { PlusOutlined, DeleteOutlined, EditOutlined, HolderOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons';
+import { Modal, Input, Select, message, Spin, Tooltip, ColorPicker } from 'antd';
+import { 
+  Plus, 
+  Trash2, 
+  GripVertical, 
+  Save, 
+  Tag, 
+  ChevronRight,
+  Edit2,
+  Palette,
+  Settings
+} from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -14,12 +24,12 @@ interface KanbanSettingsModalProps {
   onColumnsChanged: () => void;
 }
 
-// Sortable item wrapper
+// Sortable item wrapper with new design
 const SortableColumnItem: React.FC<{
   column: KanbanColumn;
-  onEdit: (col: KanbanColumn) => void;
-  onDelete: (id: string) => void;
-}> = ({ column, onEdit, onDelete }) => {
+  isSelected: boolean;
+  onSelect: (col: KanbanColumn) => void;
+}> = ({ column, isSelected, onSelect }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: column.id });
 
   const style = {
@@ -28,55 +38,34 @@ const SortableColumnItem: React.FC<{
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleEditClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onEdit(column);
-  };
-
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Popconfirm will handle the actual deletion
-  };
-
   return (
-    <div
+    <button
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg mb-2 hover:shadow-sm transition-shadow"
+      onClick={() => onSelect(column)}
+      className={`w-full flex items-center gap-3 p-3 md:p-4 rounded-xl md:rounded-2xl transition-all border ${
+        isSelected 
+        ? 'bg-white border-blue-100 shadow-md ring-2 md:ring-4 ring-blue-500/10' 
+        : 'border-transparent hover:bg-white hover:shadow-sm'
+      }`}
     >
       <div {...attributes} {...listeners} className="cursor-grab text-gray-400 hover:text-gray-600">
-        <HolderOutlined />
+        <GripVertical size={16} />
       </div>
-      <div className="flex-1">
-        <div className="font-medium">{column.label}</div>
-        <div className="text-xs text-gray-500">
-          {column.gmailLabel ? <Tag color="blue">{column.gmailLabel}</Tag> : <Tag>No Label</Tag>}
-          {column.isDefault && <Tag color="green">Default</Tag>}
-        </div>
+      <div 
+        className="w-3 h-3 rounded-full flex-shrink-0" 
+        style={{ backgroundColor: column.color || '#64748b' }}
+      />
+      <div className="text-left flex-1 overflow-hidden min-w-0">
+        <p className={`text-sm font-semibold truncate ${isSelected ? 'text-blue-600' : 'text-gray-700'}`}>
+          {column.label}
+        </p>
+        <p className="text-xs text-gray-400 truncate">
+          {column.gmailLabel || 'No Label'}
+        </p>
       </div>
-      <div onClick={(e) => e.stopPropagation()}>
-        <Space>
-          <Button size="small" icon={<EditOutlined />} onClick={handleEditClick} />
-          <Tooltip title={column.isDefault ? "Default columns cannot be deleted" : ""}>
-            <Popconfirm
-              title="Delete this column?"
-              onConfirm={() => onDelete(column.id)}
-              okText="Yes"
-              cancelText="No"
-              disabled={column.isDefault}
-            >
-              <Button 
-                size="small" 
-                icon={<DeleteOutlined />} 
-                danger 
-                disabled={column.isDefault}
-                onClick={handleDeleteClick}
-              />
-            </Popconfirm>
-          </Tooltip>
-        </Space>
-      </div>
-    </div>
+      <ChevronRight size={14} className={`flex-shrink-0 ${isSelected ? 'text-blue-500' : 'text-gray-300'}`} />
+    </button>
   );
 };
 
@@ -90,9 +79,8 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
   const [editingColumn, setEditingColumn] = useState<KanbanColumn | null>(null);
   const [editForm, setEditForm] = useState({ label: '', gmailLabel: '', color: '' });
 
-  // New column state
-  const [isAdding, setIsAdding] = useState(false);
-  const [newForm, setNewForm] = useState({ label: '', gmailLabel: '', color: '' });
+  // Mobile view state
+  const [showEditPanel, setShowEditPanel] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -106,7 +94,7 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
       col.gmailLabel === gmailLabel && col.id !== excludeColumnId
     );
     if (duplicateColumns.length > 0) {
-      return `Warning: Label "${gmailLabel}" is already used by column "${duplicateColumns[0].label}". Emails may appear in multiple columns.`;
+      return `Warning: Label "${gmailLabel}" is already used by column "${duplicateColumns[0].label}".`;
     }
     return null;
   };
@@ -114,6 +102,8 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
   useEffect(() => {
     if (open) {
       fetchData();
+      setShowEditPanel(false);
+      setEditingColumn(null);
     }
   }, [open]);
 
@@ -143,57 +133,49 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
     const newOrder = arrayMove(columns, oldIndex, newIndex);
     setColumns(newOrder);
 
-    // Save new order to backend
     try {
       const updatedColumns = await kanbanService.reorderColumns(newOrder.map(c => c.id));
       setColumns(updatedColumns.sort((a, b) => a.order - b.order));
-      // No need to refetch board, just notify meta changed
       onColumnsChanged();
     } catch (error) {
       console.error('Failed to reorder:', error);
-      message.error('Failed to save order');
-      fetchData(); // Revert
+      message.error('Failed to reorder');
+      fetchData();
     }
   };
 
   const handleAddColumn = async () => {
-    if (!newForm.label.trim()) {
-      message.warning('Label is required');
-      return;
-    }
     setSaving(true);
-    
-    // Optimistic update - create temporary column for immediate feedback
     const tempId = `temp_${Date.now()}`;
     const tempColumn = {
       id: tempId,
-      key: newForm.label.toLowerCase().replace(/\s+/g, '_'),
-      label: newForm.label,
-      gmailLabel: newForm.gmailLabel,
-      color: newForm.color,
+      key: `new_column_${Date.now()}`,
+      label: 'New Column',
+      gmailLabel: '',
+      color: '#64748b',
       order: columns.length,
       isDefault: false,
       userId: ''
     };
     setColumns(prev => [...prev, tempColumn]);
-    
+    startEdit(tempColumn);
+
     try {
       const newColumn = await kanbanService.createColumn({
-        label: newForm.label,
-        gmailLabel: newForm.gmailLabel,
-        color: newForm.color,
+        label: 'New Column',
+        gmailLabel: '',
+        color: '#64748b',
       });
-      message.success('Column created');
-      setNewForm({ label: '', gmailLabel: '', color: '' });
-      setIsAdding(false);
-      // Replace temp column with real one
       setColumns(prev => prev.map(col => col.id === tempId ? newColumn : col).sort((a, b) => a.order - b.order));
+      setEditingColumn(newColumn);
+      setEditForm({ label: newColumn.label, gmailLabel: newColumn.gmailLabel || '', color: newColumn.color || '#64748b' });
       onColumnsChanged();
     } catch (error) {
       console.error('Failed to create column:', error);
       message.error('Failed to create column');
-      // Revert optimistic update
       setColumns(prev => prev.filter(col => col.id !== tempId));
+      setEditingColumn(null);
+      setShowEditPanel(false);
     } finally {
       setSaving(false);
     }
@@ -213,10 +195,9 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
         color: editForm.color,
       });
       message.success('Column updated');
-      setEditingColumn(null);
-      // Update local state with returned column
       setColumns(prev => prev.map(col => col.id === updated.id ? updated : col).sort((a, b) => a.order - b.order));
-      // Only notify parent, no need to refetch board for metadata changes
+      setEditingColumn(updated);
+      setEditForm({ label: updated.label, gmailLabel: updated.gmailLabel || '', color: updated.color || '' });
       onColumnsChanged();
     } catch (error) {
       console.error('Failed to update column:', error);
@@ -226,154 +207,212 @@ const KanbanSettingsModal: React.FC<KanbanSettingsModalProps> = ({ open, onClose
     }
   };
 
-  const handleDeleteColumn = async (id: string) => {
-    // Optimistic update - remove from UI immediately
-    const backup = columns;
-    setColumns(prev => prev.filter(col => col.id !== id));
+  const handleDeleteColumn = async () => {
+    if (!editingColumn) return;
+    if (editingColumn.isDefault) {
+      message.warning('Cannot delete default columns');
+      return;
+    }
     
+    const backup = columns;
+    setColumns(prev => prev.filter(col => col.id !== editingColumn.id));
+    setEditingColumn(null);
+    setShowEditPanel(false);
+
     try {
-      const remainingColumns = await kanbanService.deleteColumn(id);
+      const remainingColumns = await kanbanService.deleteColumn(editingColumn.id);
       message.success('Column deleted');
-      // Update with server response
       setColumns(remainingColumns.sort((a, b) => a.order - b.order));
-      // Notify parent to refresh board (this removes column from board too)
       onColumnsChanged();
     } catch (error) {
       console.error('Failed to delete column:', error);
       message.error('Failed to delete column');
-      // Revert optimistic update
       setColumns(backup);
     }
   };
 
   const startEdit = (col: KanbanColumn) => {
     setEditingColumn(col);
-    setEditForm({ label: col.label, gmailLabel: col.gmailLabel || '', color: col.color || '' });
+    setEditForm({ label: col.label, gmailLabel: col.gmailLabel || '', color: col.color || '#64748b' });
+    setShowEditPanel(true);
   };
 
-  const cancelEdit = () => {
-    setEditingColumn(null);
+  const handleBackToList = () => {
+    setShowEditPanel(false);
   };
 
   return (
     <Modal
-      title="Kanban Board Settings"
       open={open}
       onCancel={onClose}
       footer={null}
-      width={500}
+      width={900}
       centered
+      closable={false}
       styles={{
+        content: {
+          padding: 0,
+          borderRadius: '16px',
+          overflow: 'hidden',
+        },
         body: {
-          maxHeight: '60vh',
-          overflowY: 'auto',
+          padding: 0,
         }
       }}
       destroyOnHidden
     >
       {loading ? (
-        <div className="flex justify-center p-8"><Spin size="large" /></div>
+        <div className="flex justify-center items-center h-[400px] md:h-[500px]">
+          <Spin size="large" />
+        </div>
       ) : (
-        <div className="space-y-4">
-          {/* Column List */}
-          <div className="mb-4">
-            <h4 className="font-medium mb-2">Columns (drag to reorder)</h4>
-            {columns.length === 0 ? (
-              <Empty description="No columns configured" />
-            ) : (
+        <div className="flex flex-col md:flex-row h-[80vh] md:h-[70vh] max-h-[600px]">
+          {/* Left side: List of Columns - Hidden on mobile when editing */}
+          <div className={`${showEditPanel ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-b md:border-b-0 md:border-r border-gray-100 flex-col bg-gray-50/50`}>
+            <div className="p-6 md:p-8 pb-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Settings size={18} className="text-blue-600" />
+                <h2 className="text-lg md:text-xl font-bold text-gray-800">Column Settings</h2>
+              </div>
+              <p className="text-xs text-gray-400 font-medium mt-1">Manage workflow columns</p>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-1 md:space-y-2">
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={columns.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                  {columns.map(col => (
+                  {columns.map((col) => (
                     <SortableColumnItem
                       key={col.id}
                       column={col}
-                      onEdit={startEdit}
-                      onDelete={handleDeleteColumn}
+                      isSelected={editingColumn?.id === col.id}
+                      onSelect={startEdit}
                     />
                   ))}
                 </SortableContext>
               </DndContext>
-            )}
+              
+              <button 
+                onClick={handleAddColumn}
+                disabled={saving}
+                className="w-full py-3 md:py-4 border-2 border-dashed border-gray-200 rounded-xl md:rounded-2xl text-gray-400 font-medium text-xs hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Plus size={16} /> Add New Column
+              </button>
+            </div>
+            
+            <div className="p-4 md:p-6">
+              <button 
+                onClick={onClose}
+                className="w-full py-2.5 md:py-3 bg-gray-900 text-white text-xs font-semibold rounded-lg md:rounded-xl hover:bg-gray-800 transition-all"
+              >
+                Close Settings
+              </button>
+            </div>
           </div>
 
-          {/* Add New Column */}
-          {isAdding ? (
-            <div className="p-3 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-              <h4 className="font-medium mb-2">New Column</h4>
-              <Space direction="vertical" className="w-full">
-                <Input
-                  placeholder="Column Name"
-                  value={newForm.label}
-                  onChange={e => setNewForm(prev => ({ ...prev, label: e.target.value }))}
-                />
-                <Select
-                  placeholder="Map to Gmail Label (optional)"
-                  value={newForm.gmailLabel || undefined}
-                  onChange={val => setNewForm(prev => ({ ...prev, gmailLabel: val }))}
-                  allowClear
-                  className="w-full"
-                  status={getDuplicateLabelWarning(newForm.gmailLabel) ? 'warning' : undefined}
-                  options={gmailLabels.map(l => ({ value: l.id, label: `${l.name} (${l.type})` }))}
-                />
-                {getDuplicateLabelWarning(newForm.gmailLabel) && (
-                  <div className="text-yellow-600 text-xs mt-1 bg-yellow-50 p-2 rounded">
-                    ⚠️ {getDuplicateLabelWarning(newForm.gmailLabel)}
-                  </div>
-                )}
-                <Space>
-                  <Button type="primary" icon={<SaveOutlined />} onClick={handleAddColumn} loading={saving}>
-                    Save
-                  </Button>
-                  <Button icon={<CloseOutlined />} onClick={() => setIsAdding(false)}>Cancel</Button>
-                </Space>
-              </Space>
-            </div>
-          ) : (
-            <Button type="dashed" icon={<PlusOutlined />} onClick={() => setIsAdding(true)} block>
-              Add Column
-            </Button>
-          )}
+          {/* Right side: Editing Panel - Full width on mobile when editing */}
+          <div className={`${showEditPanel ? 'flex' : 'hidden md:flex'} flex-1 flex-col bg-white`}>
+            {editingColumn ? (
+              <div className="flex-1 flex flex-col p-6 md:p-12 overflow-y-auto">
+                {/* Mobile back button */}
+                <button 
+                  onClick={handleBackToList}
+                  className="md:hidden flex items-center gap-2 text-gray-500 text-sm mb-4 hover:text-gray-700"
+                >
+                  <ChevronRight size={16} className="rotate-180" /> Back to list
+                </button>
 
-          {/* Edit Column Modal/Drawer */}
-          <Modal
-            title="Edit Column"
-            open={!!editingColumn}
-            onCancel={cancelEdit}
-            footer={null}
-            destroyOnHidden
-          >
-            <Space direction="vertical" className="w-full">
-              <label className="text-sm text-gray-600">Label</label>
-              <Input
-                value={editForm.label}
-                onChange={e => setEditForm(prev => ({ ...prev, label: e.target.value }))}
-              />
-              <label className="text-sm text-gray-600">Gmail Label Mapping</label>
-              <Select
-                placeholder="Map to Gmail Label"
-                value={editForm.gmailLabel || undefined}
-                onChange={val => setEditForm(prev => ({ ...prev, gmailLabel: val }))}
-                allowClear
-                className="w-full"
-                status={getDuplicateLabelWarning(editForm.gmailLabel, editingColumn?.id) ? 'warning' : undefined}
-                options={gmailLabels.map(l => ({ value: l.id, label: `${l.name} (${l.type})` }))}
-              />
-              {getDuplicateLabelWarning(editForm.gmailLabel, editingColumn?.id) && (
-                <div className="text-yellow-600 text-xs mt-1 bg-yellow-50 p-2 rounded">
-                  ⚠️ {getDuplicateLabelWarning(editForm.gmailLabel, editingColumn?.id)}
+                <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-8 md:mb-10">
+                  <div>
+                    <span className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-1 block">Editing</span>
+                    <h3 className="text-2xl md:text-3xl font-bold text-gray-800">{editingColumn.label}</h3>
+                  </div>
+                  <Tooltip title={editingColumn.isDefault ? "Cannot delete default columns" : ""}>
+                    <button 
+                      onClick={handleDeleteColumn}
+                      disabled={editingColumn.isDefault}
+                      className="flex items-center gap-2 px-3 md:px-4 py-2 bg-red-50 text-red-500 rounded-lg text-xs font-medium hover:bg-red-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Trash2 size={14} /> Delete Column
+                    </button>
+                  </Tooltip>
                 </div>
-              )}
-              <label className="text-sm text-gray-600">Color (optional)</label>
-              <ColorPicker
-                value={editForm.color || '#1890ff'}
-                onChange={(_, hex) => setEditForm(prev => ({ ...prev, color: hex }))}
-              />
-              <Space className="mt-4">
-                <Button type="primary" onClick={handleUpdateColumn} loading={saving}>Save Changes</Button>
-                <Button onClick={cancelEdit}>Cancel</Button>
-              </Space>
-            </Space>
-          </Modal>
+
+                <div className="space-y-6 md:space-y-8">
+                  {/* Title Input */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
+                      <Edit2 size={12} /> Display Label
+                    </label>
+                    <Input 
+                      size="large"
+                      value={editForm.label}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, label: e.target.value }))}
+                      className="!rounded-lg !border-gray-200"
+                    />
+                  </div>
+
+                  {/* Gmail Label Mapping */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
+                      <Tag size={12} /> Gmail Label Mapping
+                    </label>
+                    <Select
+                      size="large"
+                      placeholder="Select Gmail Label (optional)"
+                      value={editForm.gmailLabel || undefined}
+                      onChange={val => setEditForm(prev => ({ ...prev, gmailLabel: val || '' }))}
+                      allowClear
+                      className="w-full"
+                      status={getDuplicateLabelWarning(editForm.gmailLabel, editingColumn?.id) ? 'warning' : undefined}
+                      options={gmailLabels.map(l => ({ value: l.id, label: `${l.name} (${l.type})` }))}
+                    />
+                    {getDuplicateLabelWarning(editForm.gmailLabel, editingColumn?.id) && (
+                      <div className="text-amber-600 text-xs mt-1 bg-amber-50 p-2 rounded-lg">
+                        ⚠️ {getDuplicateLabelWarning(editForm.gmailLabel, editingColumn?.id)}
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-400">This maps the column to a Gmail label for synchronization.</p>
+                  </div>
+
+                  {/* Color Picker */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
+                      <Palette size={12} /> Column Color
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <ColorPicker
+                        value={editForm.color || '#64748b'}
+                        onChange={(_, hex) => setEditForm(prev => ({ ...prev, color: hex }))}
+                        showText
+                      />
+                      <span className="text-sm text-gray-500">Choose any color</span>
+                    </div>
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="pt-4 md:pt-6">
+                    <button
+                      onClick={handleUpdateColumn}
+                      disabled={saving}
+                      className="flex items-center gap-2 px-6 md:px-8 py-2.5 md:py-3 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50"
+                    >
+                      <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 md:p-12">
+                <div className="w-16 h-16 md:w-24 md:h-24 bg-gray-50 rounded-2xl md:rounded-3xl flex items-center justify-center text-gray-200 mb-4 md:mb-6">
+                  <Edit2 size={32} className="md:hidden" />
+                  <Edit2 size={40} className="hidden md:block" />
+                </div>
+                <h3 className="text-lg md:text-xl font-bold text-gray-800">Select a Column to Edit</h3>
+                <p className="text-sm text-gray-400 mt-2 max-w-xs">Change the name, color, and Gmail sync rules for your workflow columns.</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </Modal>
