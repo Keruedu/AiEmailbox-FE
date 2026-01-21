@@ -457,14 +457,14 @@ export default function InboxPage() {
       <Layout style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <Header className="inbox-header" style={{
           background: '#fff',
-          padding: '12px 16px', // Increased padding for 2 rows
+          padding: '2px 16px', // Increased padding for 2 rows
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           zIndex: 1,
           height: 'auto',
-          minHeight: '64px',
+          minHeight: '50px',
           flexWrap: 'wrap',
           gap: '12px', // Add gap for wrapping
           flexShrink: 0
