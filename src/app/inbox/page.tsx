@@ -11,7 +11,6 @@ import {
   FileOutlined,
   DeleteOutlined,
   FolderOutlined,
-  MailOutlined,
   ReloadOutlined,
   LogoutOutlined,
   PaperClipOutlined,
@@ -86,6 +85,9 @@ export default function InboxPage() {
   const handleViewToggle = (mode: 'list' | 'kanban') => {
     setViewMode(mode);
     localStorage.setItem('viewMode', mode);
+    // Clear selected email when switching views to prevent popup in kanban
+    setSelectedEmail(null);
+    setShowMobileDetail(false);
   };
 
   const handleComposeClose = () => {
@@ -475,7 +477,12 @@ export default function InboxPage() {
             >
               <MenuOutlined style={{ fontSize: '20px', color: '#667eea' }} />
             </button>
-            <MailOutlined style={{ fontSize: '24px', color: '#667eea' }} />
+            <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl shadow text-white" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
+                <path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/>
+              </svg>
+            </div>
             <Title level={4} style={{ margin: 0, whiteSpace: 'nowrap' }}>AI Email Box</Title>
           </div>
 
