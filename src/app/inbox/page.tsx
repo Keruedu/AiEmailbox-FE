@@ -667,7 +667,7 @@ export default function InboxPage() {
                   block
                   size="large"
                   onClick={() => setIsComposeVisible(true)}
-                  style={{ marginBottom: '16px', borderRadius: '24px', height: '48px' }}
+                  style={{ borderRadius: '24px', height: '48px' }}
                 >
                   Compose
                 </Button>
