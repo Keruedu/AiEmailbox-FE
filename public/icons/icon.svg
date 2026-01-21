@@ -1,14 +1,19 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background -->
-  <rect width="512" height="512" rx="64" fill="#667eea"/>
+  <!-- Background with gradient effect -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea"/>
+      <stop offset="100%" style="stop-color:#764ba2"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#bgGradient)"/>
   
-  <!-- Email icon -->
-  <path d="M128 160C119.163 160 112 167.163 112 176V336C112 344.837 119.163 352 128 352H384C392.837 352 400 344.837 400 336V176C400 167.163 392.837 160 384 160H128Z" fill="white" stroke="white" stroke-width="8"/>
-  
-  <!-- Envelope flap -->
-  <path d="M112 176L256 272L400 176" stroke="#667eea" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
-  
-  <!-- AI Sparkle -->
-  <circle cx="368" cy="192" r="24" fill="#fbbf24"/>
-  <path d="M368 168L372 184L388 188L372 192L368 208L364 192L348 188L364 184L368 168Z" fill="white"/>
+  <!-- Sparkles icon (lucide-react sparkles) - scaled and centered -->
+  <g transform="translate(96, 96) scale(13.33)" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
+    <path d="M20 3v4"/>
+    <path d="M22 5h-4"/>
+    <path d="M4 17v2"/>
+    <path d="M5 18H3"/>
+  </g>
 </svg>
