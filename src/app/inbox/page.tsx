@@ -21,6 +21,7 @@ import {
   BarsOutlined,
   ExportOutlined,
   MenuOutlined,
+  PieChartOutlined,
 } from '@ant-design/icons';
 import KanbanBoard from '@/app/components/Kanban/KanbanBoard';
 import SearchResults from '@/app/components/SearchResults';
@@ -244,11 +245,11 @@ export default function InboxPage() {
 
   const handleStar = async (e: React.MouseEvent, email: Email) => {
     e.stopPropagation();
-    
+
     // Store original state for rollback
     const originalStarred = email.isStarred;
     const newStarred = !email.isStarred;
-    
+
     // Optimistic update FIRST (instant UI feedback)
     const updateEmails = (list: Email[]) => list.map(e =>
       e.id === email.id ? { ...e, isStarred: newStarred } : e
@@ -265,7 +266,7 @@ export default function InboxPage() {
     } catch (error) {
       console.error('Star error:', error);
       message.error('Failed to update star, reverting...');
-      
+
       // Rollback on failure
       setEmails(prev => prev.map(e =>
         e.id === email.id ? { ...e, isStarred: originalStarred } : e
@@ -278,11 +279,11 @@ export default function InboxPage() {
 
   const handleDelete = async (e: React.MouseEvent, email: Email) => {
     e.stopPropagation();
-    
+
     // Store original emails for rollback
     const originalEmails = [...emails];
     const emailIndex = emails.findIndex(em => em.id === email.id);
-    
+
     // Optimistic update FIRST (instant UI feedback)
     setEmails(emails.filter(e => e.id !== email.id));
     if (selectedEmail?.id === email.id) {
@@ -297,7 +298,7 @@ export default function InboxPage() {
     } catch (error) {
       console.error('Delete error:', error);
       message.error('Failed to delete email, restoring...');
-      
+
       // Rollback on failure - restore the email
       const restoredEmails = [...originalEmails];
       if (emailIndex >= 0) {
@@ -514,6 +515,13 @@ export default function InboxPage() {
                         </div>
                       ),
                       disabled: true,
+                    },
+                    { type: 'divider' },
+                    {
+                      key: 'statistics',
+                      icon: <PieChartOutlined />,
+                      label: 'Statistics',
+                      onClick: () => window.location.href = '/statistics',
                     },
                     { type: 'divider' },
                     {
@@ -900,8 +908,8 @@ export default function InboxPage() {
                         {selectedEmail.isStarred ? 'Unstar' : 'Star'}
                       </Button>
                       <Button icon={<DeleteOutlined />} danger onClick={(e) => handleDelete(e, selectedEmail)}>Delete</Button>
-                      <Button 
-                        icon={<ExportOutlined />} 
+                      <Button
+                        icon={<ExportOutlined />}
                         onClick={() => {
                           const messageRef = selectedEmail.threadId || selectedEmail.id;
                           window.open(`https://mail.google.com/mail/u/0/#inbox/${messageRef}`, '_blank', 'noopener,noreferrer');
